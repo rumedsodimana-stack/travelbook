@@ -81,7 +81,7 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ bookings }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div>
           <h2 className="text-4xl font-black text-white tracking-tighter uppercase">My Bookings</h2>

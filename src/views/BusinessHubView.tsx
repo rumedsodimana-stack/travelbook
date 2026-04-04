@@ -114,7 +114,7 @@ const FEATURED_PAGES: Array<{
 
 export const BusinessHubView: React.FC<BusinessHubViewProps> = ({ onProfileClick, onBookClick }) => {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <GlassCard className="overflow-hidden border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8">
         <div className="grid gap-8 lg:grid-cols-[1.4fr,1fr]">
           <div className="space-y-5">

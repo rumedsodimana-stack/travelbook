@@ -146,9 +146,9 @@ export const NotificationsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between px-2">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 py-6 gap-4">
+      {/* Header — pinned */}
+      <div className="flex-shrink-0 flex items-center justify-between px-2">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tight">Activity</h2>
           <p className="text-white/40 text-[9px] uppercase font-black tracking-widest mt-1">
@@ -175,8 +175,8 @@ export const NotificationsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+      {/* Tabs — pinned */}
+      <div className="flex-shrink-0 flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
         {TABS.map((tab) => {
           const tabCount = tab.id === 'all'
             ? notifications.filter(n => !n.isRead).length
@@ -204,8 +204,8 @@ export const NotificationsView: React.FC = () => {
         })}
       </div>
 
-      {/* Notification List */}
-      <div className="space-y-3">
+      {/* Notification List — scrolls internally */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
         {filteredNotifs.length === 0 ? (
           <GlassCard className="p-12 text-center">
             <Bell className="mx-auto text-white/10 mb-4" size={48} />

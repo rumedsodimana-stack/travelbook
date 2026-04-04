@@ -119,7 +119,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-right-4 duration-500 pb-32">
+    <div className="animate-in fade-in slide-in-from-right-4 duration-500">
       {activeMapLocation && <MapModal location={activeMapLocation} onClose={() => setActiveMapLocation(null)} />}
 
       <div className="flex items-center justify-between mb-8">

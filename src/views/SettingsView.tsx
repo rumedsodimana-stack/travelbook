@@ -50,7 +50,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onLogout, onAdminPor
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="px-2">
         <h2 className="text-3xl font-black text-white tracking-tight">Settings</h2>
         <p className="text-white/40 text-sm mt-1">Manage your account, privacy, payments, and app preferences.</p>

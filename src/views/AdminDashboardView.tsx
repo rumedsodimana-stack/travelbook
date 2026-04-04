@@ -76,7 +76,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBack }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-32">
+    <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <button

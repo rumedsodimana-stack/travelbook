@@ -127,7 +127,7 @@ export const PostDetailView: React.FC<PostDetailViewProps> = ({ post, onBack, on
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-right-4 duration-500 pb-32 relative">
+    <div className="animate-in fade-in slide-in-from-right-4 duration-500 relative">
       <button
         onClick={onBack}
         className="mb-6 flex items-center gap-2 text-white/60 hover:text-white transition-all font-bold uppercase tracking-widest text-xs group"

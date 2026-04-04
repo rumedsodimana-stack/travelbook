@@ -163,6 +163,52 @@ const INITIAL_CHATS: Chat[] = [
     timestamp: 'Yesterday',
     unreadCount: 0,
   },
+  {
+    id: 'chat-u3',
+    participant: {
+      ...generateMockUser(47),
+      id: 'u3',
+      name: 'Aria Nomad',
+      username: '@aria_nomad',
+      avatar: 'https://picsum.photos/seed/aria-solo/200',
+      category: 'Solo Traveler',
+      bio: 'Slow travel, budget stays, off-the-beaten-path finds.',
+    },
+    lastMessage: "Adding it all to my plan 🙌",
+    timestamp: 'Mon',
+    unreadCount: 1,
+  },
+  {
+    id: 'chat-u4',
+    participant: {
+      ...generateMockUser(48),
+      id: 'u4',
+      name: 'Santorini Crest Hotel',
+      username: '@santorinicense',
+      avatar: 'https://picsum.photos/seed/santorini-h/200',
+      category: 'Hotel',
+      isBusiness: true,
+      bio: 'Clifftop suites and cave rooms with caldera views.',
+    },
+    lastMessage: 'Our concierge will greet you at arrival.',
+    timestamp: 'Tue',
+    unreadCount: 0,
+  },
+  {
+    id: 'chat-u5',
+    participant: {
+      ...generateMockUser(49),
+      id: 'u5',
+      name: 'Marcus Chen',
+      username: '@marcus_adventures',
+      avatar: 'https://picsum.photos/seed/marcus/200',
+      category: 'Adventure Traveler',
+      bio: 'Multi-day treks, gear reviews, and route planning.',
+    },
+    lastMessage: "This is going to be epic 🏔️🔥",
+    timestamp: 'Wed',
+    unreadCount: 3,
+  },
 ];
 
 const ROUTE_META: Partial<Record<AppRoute, { title: string; subtitle: string }>> = {

@@ -8,7 +8,7 @@ import {
   SUPPLIER_CATEGORY_BY_TYPE,
   SUPPLIER_TYPE_OPTIONS,
   TRAVELER_STYLE_OPTIONS,
-} from '@/onboardingConfig';
+} from '@/config/onboarding';
 import { User, Review, Post } from '@/types';
 import {
   LogOut, Settings, Award, Map, Camera, Briefcase,

@@ -76,7 +76,7 @@ export const ChatsView: React.FC<ChatsViewProps> = ({ chats, setChats, currentUs
         const aiResponse: Message = {
           id: `ai-${Date.now()}`,
           senderId: selectedChat.participant.id,
-          text: 'Thanks for your message. I'm checking the latest details now.',
+          text: "Thanks for your message. I'm checking the latest details now.",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => ({

@@ -52,6 +52,9 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
   const [travelData, setTravelData] = useState<TravelData | null>(null);
   const [activeMapLocation, setActiveMapLocation] = useState<string | null>(null);
   const [searchPhase, setSearchPhase] = useState('');
+  const [bookedItemKeys, setBookedItemKeys] = useState<Set<string>>(new Set());
+  const [bookingAll, setBookingAll] = useState(false);
+  const [bookingAllPhase, setBookingAllPhase] = useState('');
 
   const handleGenerate = async () => {
     if (!destination || !interests) return;
@@ -68,6 +71,8 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
     setLoading(true);
     setError(null);
     setTravelData(null);
+    setBookedItemKeys(new Set());
+    setBookingAllPhase('');
 
     setSearchPhase('Building your trip plan...');
     await new Promise(r => setTimeout(r, 700));
@@ -91,7 +96,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
     }
   };
 
-  const handleBookItem = async (item: any, customCategory?: string) => {
+  const handleBookItem = async (item: any, customCategory?: string, itemKey?: string) => {
     setSearchPhase('Checking availability...');
     const validation = await validateInventory(item.activity || item.airline || item.name);
     setSearchPhase('');
@@ -107,9 +112,50 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
         bio: 'Verified travel partner ready for booking.'
       };
       onBookClick(mockBusiness);
+      if (itemKey) {
+        setBookedItemKeys(prev => new Set([...prev, itemKey]));
+      }
     } else {
       setError('That option is not available right now. Please try another one.');
     }
+  };
+
+  const handleBookAll = async () => {
+    if (bookingAll || !travelData) return;
+    setBookingAll(true);
+
+    const allItems: { item: any; key: string; label: string }[] = [];
+    if (travelData.flights && !bookedItemKeys.has('flight')) {
+      allItems.push({ item: travelData.flights, key: 'flight', label: travelData.flights.airline || 'Flight' });
+    }
+    travelData.days?.forEach((day: any, dIdx: number) => {
+      day.items?.forEach((item: any, iIdx: number) => {
+        const key = `day-${dIdx}-${iIdx}`;
+        if (!bookedItemKeys.has(key)) {
+          allItems.push({ item, key, label: item.activity || item.name || 'Item' });
+        }
+      });
+    });
+
+    const phaseLabels: Record<string, string> = {
+      Flight: 'Booking flights',
+      Hotel: 'Booking hotel',
+      Transport: 'Booking transport',
+    };
+
+    for (const { item, key, label } of allItems) {
+      const cat = item.category || item.type || '';
+      const phase = phaseLabels[cat] || `Booking ${label.slice(0, 30)}`;
+      setBookingAllPhase(`${phase}...`);
+      await new Promise(r => setTimeout(r, 800));
+      setBookedItemKeys(prev => new Set([...prev, key]));
+      await new Promise(r => setTimeout(r, 250));
+    }
+
+    setBookingAllPhase('All booked! 🎉');
+    await new Promise(r => setTimeout(r, 1500));
+    setBookingAll(false);
+    setBookingAllPhase('');
   };
 
   const handleBuddyRequest = () => {
@@ -288,7 +334,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
             </GlassCard>
 
             {travelData.flights && (
-              <GlassCard className="p-8 border-sky-500/30 bg-sky-500/5 group hover:border-sky-400 transition-all cursor-pointer overflow-hidden relative" onClick={() => handleBookItem(travelData.flights, 'Flight')}>
+              <GlassCard className={`p-8 border-sky-500/30 bg-sky-500/5 group overflow-hidden relative transition-all ${bookedItemKeys.has('flight') ? 'border-emerald-500/40 bg-emerald-500/5' : 'hover:border-sky-400 cursor-pointer'}`}>
                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform">
                   <Plane size={80} />
                 </div>
@@ -303,9 +349,15 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
                   <p className="text-white font-bold text-lg mb-1">{travelData.flights.airline}</p>
                   <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">{travelData.flights.duration} · estimated travel time</p>
                 </div>
-                <button className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20">
-                  Book This Flight <ArrowRight size={14} />
-                </button>
+                {bookedItemKeys.has('flight') ? (
+                  <div className="w-full py-4 bg-emerald-500/20 text-emerald-400 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 border border-emerald-500/30">
+                    <CheckCircle2 size={14} /> Booked
+                  </div>
+                ) : (
+                  <button onClick={() => handleBookItem(travelData.flights, 'Flight', 'flight')} className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20">
+                    Book This Flight <ArrowRight size={14} />
+                  </button>
+                )}
               </GlassCard>
             )}
           </div>
@@ -323,33 +375,44 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {day.items?.map((item: any, iIdx: number) => (
-                  <GlassCard key={iIdx} className="p-6 border-white/10 hover:border-indigo-500/40 transition-all group overflow-hidden relative">
-                    <div className="flex flex-col h-full">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
-                            {item.category?.includes('Dining') ? <Utensils size={18} /> : <Activity size={18} />}
+                {day.items?.map((item: any, iIdx: number) => {
+                  const itemKey = `day-${idx}-${iIdx}`;
+                  const isBooked = bookedItemKeys.has(itemKey);
+                  return (
+                    <GlassCard key={iIdx} className={`p-6 border-white/10 hover:border-indigo-500/40 transition-all group overflow-hidden relative ${isBooked ? 'border-emerald-500/30 bg-emerald-500/5' : ''}`}>
+                      <div className="flex flex-col h-full">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
+                              {item.category?.includes('Dining') ? <Utensils size={18} /> : <Activity size={18} />}
+                            </div>
+                            <span className="text-indigo-400 text-[9px] font-black uppercase tracking-widest">{item.time}</span>
                           </div>
-                          <span className="text-indigo-400 text-[9px] font-black uppercase tracking-widest">{item.time}</span>
+                          <span className="text-emerald-400 font-black text-lg tracking-tighter">${item.estimatedCost}</span>
                         </div>
-                        <span className="text-emerald-400 font-black text-lg tracking-tighter">${item.estimatedCost}</span>
-                      </div>
 
-                      <h5 className="text-white font-black text-lg leading-tight mb-2 group-hover:text-indigo-400 transition-colors">{item.activity}</h5>
-                      <p className="text-white/50 text-xs mb-8 leading-relaxed line-clamp-2">{item.description}</p>
+                        <h5 className="text-white font-black text-lg leading-tight mb-2 group-hover:text-indigo-400 transition-colors">{item.activity}</h5>
+                        <p className="text-white/50 text-xs mb-8 leading-relaxed line-clamp-2">{item.description}</p>
 
-                      <div className="mt-auto flex items-center justify-between">
-                        <button
-                          onClick={() => handleBookItem(item)}
-                          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-white/5 hover:bg-white/10 px-5 py-3 rounded-xl border border-white/10 transition-all"
-                        >
-                          Book This <ChevronRight size={14} />
-                        </button>
+                        <div className="mt-auto flex items-center justify-between">
+                          {isBooked ? (
+                            <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                              <CheckCircle2 size={13} /> Booked
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleBookItem(item, undefined, itemKey)}
+                              disabled={bookingAll}
+                              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-white/5 hover:bg-white/10 px-5 py-3 rounded-xl border border-white/10 transition-all disabled:opacity-40"
+                            >
+                              Book This <ChevronRight size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </GlassCard>
-                ))}
+                    </GlassCard>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -390,6 +453,25 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
               <Users size={18} /> Find Travel Buddies
             </button>
           </div>
+
+          {bookingAllPhase && (
+            <GlassCard className="p-5 border-indigo-500/30 bg-indigo-500/5 flex items-center gap-3">
+              <Loader2 size={16} className="text-indigo-400 animate-spin flex-shrink-0" />
+              <span className="text-white font-black text-xs uppercase tracking-widest">{bookingAllPhase}</span>
+            </GlassCard>
+          )}
+
+          <button
+            onClick={handleBookAll}
+            disabled={bookingAll}
+            className="w-full py-6 bg-indigo-500 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-indigo-500/20 hover:bg-indigo-400 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500 disabled:active:scale-100"
+          >
+            {bookingAll ? (
+              <><Loader2 size={18} className="animate-spin" /> Booking Journey...</>
+            ) : (
+              <><Sparkles size={18} /> Book Whole Journey</>
+            )}
+          </button>
         </div>
       )}
 

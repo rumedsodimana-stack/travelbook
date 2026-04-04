@@ -705,6 +705,7 @@ const AppContent: React.FC = () => {
             onBack={() => setCurrentRoute(AppRoute.SEARCH)}
             onBookClick={openBooking}
             onShareAsPost={handlePlannerShare}
+            onTripSaved={() => setCurrentRoute(AppRoute.BOOKINGS)}
           />
         )}
 

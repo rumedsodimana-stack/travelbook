@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { GlassCard } from '@/components/GlassCard';
 import { Booking } from '@/types';
+import { TripItinerary, TripItem, TripItemType } from '@/types/trip';
+import { useTrips } from '@/hooks/useTripStore';
 import {
-  Plane, Hotel, Utensils, ShieldCheck, ExternalLink, Ticket, Clock,
-  CheckCircle2, Bus, Train, Car, Hash, Activity, Lock, Database,
-  ArrowUpRight, Filter, Search, Globe, ChevronDown, Download,
-  QrCode, RefreshCw, AlertTriangle, Settings, MessageSquare, Trash2,
-  Smartphone, FileText, Share2
+  Plane, Hotel, Utensils, ShieldCheck, Ticket, Clock,
+  CheckCircle2, Car, Hash, Activity, Database,
+  Download, QrCode, RefreshCw, AlertTriangle, Settings,
+  Smartphone, Trash2, Bus, MapPin, Share2, ChevronLeft,
+  Calendar, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 
@@ -16,18 +18,306 @@ interface BookingsViewProps {
   bookings: Booking[];
 }
 
-export const BookingsView: React.FC<BookingsViewProps> = ({ bookings }) => {
-  const { showToast } = useToast();
-  const [filter, setFilter] = useState<string>('all');
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function fmtDisplayDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
+function fmtShortDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  } catch {
+    return dateStr;
+  }
+}
+
+function fmtRange(start: string, end: string): string {
+  return `${fmtShortDate(start)} – ${fmtShortDate(end)}`;
+}
+
+function itemTypeLabel(type: TripItemType): string {
+  switch (type) {
+    case 'flight': return 'Flight';
+    case 'taxi': return 'Taxi';
+    case 'hotel_checkin': return 'Hotel Check-in';
+    case 'hotel_checkout': return 'Hotel Checkout';
+    case 'event': return 'Event';
+    case 'transport': return 'Transport';
+    default: return 'Activity';
+  }
+}
+
+function itemIcon(type: TripItemType, size = 16) {
+  switch (type) {
+    case 'flight': return <Plane size={size} className="text-sky-400" />;
+    case 'taxi': return <Car size={size} className="text-amber-400" />;
+    case 'transport': return <Bus size={size} className="text-purple-400" />;
+    case 'hotel_checkin': return <Hotel size={size} className="text-teal-400" />;
+    case 'hotel_checkout': return <Hotel size={size} className="text-rose-400" />;
+    case 'event': return <Ticket size={size} className="text-rose-400" />;
+    default: return <Activity size={size} className="text-indigo-400" />;
+  }
+}
+
+function itemEmoji(type: TripItemType): string {
+  switch (type) {
+    case 'flight': return '✈️';
+    case 'taxi': return '🚕';
+    case 'transport': return '🚌';
+    case 'hotel_checkin': return '🏨';
+    case 'hotel_checkout': return '🏨';
+    case 'event': return '🎭';
+    default: return '🎯';
+  }
+}
+
+function contextMessage(item: TripItem): string {
+  switch (item.type) {
+    case 'taxi':
+    case 'transport': return 'Driver will be waiting for you';
+    case 'hotel_checkin': return 'Hotel is expecting your arrival';
+    case 'hotel_checkout': return `Checkout by ${item.time}`;
+    case 'event': return `Ticket confirmed — Ref: ${item.bookingRef}`;
+    case 'flight': return `Boarding at ${item.time} — Gate opens 45 min prior`;
+    default: return item.description || 'Confirmed and ready';
+  }
+}
+
+function statusColors(status: TripItem['status']) {
+  switch (status) {
+    case 'in_progress': return { chip: 'bg-amber-500/10 border-amber-500/30 text-amber-400', dot: 'bg-amber-400 animate-pulse' };
+    case 'completed': return { chip: 'bg-white/5 border-white/10 text-white/30', dot: 'bg-white/30' };
+    default: return { chip: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', dot: 'bg-emerald-500' };
+  }
+}
+
+function statusLabel(status: TripItem['status']) {
+  switch (status) {
+    case 'in_progress': return 'In Progress';
+    case 'completed': return 'Done';
+    default: return 'Confirmed';
+  }
+}
+
+function tripStatusColors(status: TripItinerary['status']) {
+  switch (status) {
+    case 'in_progress': return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+    case 'completed': return 'bg-white/5 border-white/10 text-white/30';
+    default: return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+  }
+}
+
+function tripStatusLabel(status: TripItinerary['status']) {
+  switch (status) {
+    case 'in_progress': return 'In Progress';
+    case 'completed': return 'Past Trip';
+    default: return 'Upcoming';
+  }
+}
+
+// group items by date, preserving sort order
+function groupByDate(items: TripItem[]): Array<{ date: string; items: TripItem[] }> {
+  const map = new Map<string, TripItem[]>();
+  for (const item of items) {
+    if (!map.has(item.date)) map.set(item.date, []);
+    map.get(item.date)!.push(item);
+  }
+  return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
+}
+
+// ─── Trip Timeline ───────────────────────────────────────────────────────────
+
+const TripTimeline: React.FC<{ trip: TripItinerary }> = ({ trip }) => {
+  const groups = groupByDate(trip.items);
+  const nextItemId = trip.items.find((i) => i.status === 'upcoming')?.id;
+
+  return (
+    <div className="space-y-6 pb-4">
+      {groups.map(({ date, items }) => (
+        <div key={date}>
+          {/* Date header */}
+          <div className="sticky top-0 z-10 py-3 bg-[#07161d]/95 backdrop-blur-xl mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+                <Calendar size={12} className="text-teal-400" />
+                <span className="text-white/70 text-[9px] font-black uppercase tracking-widest">
+                  {fmtDisplayDate(date)}
+                </span>
+              </div>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
+          </div>
+
+          {/* Items */}
+          <div className="relative">
+            {/* Vertical connector line */}
+            <div className="absolute left-[17px] top-6 bottom-6 w-px bg-gradient-to-b from-white/15 via-white/8 to-transparent" />
+
+            <div className="space-y-4">
+              {items.map((item) => {
+                const isNext = item.id === nextItemId;
+                const sc = statusColors(item.status);
+                return (
+                  <div
+                    key={item.id}
+                    className={`relative flex gap-4 ${isNext ? 'animate-in slide-in-from-left-2 duration-500' : ''}`}
+                  >
+                    {/* Left dot */}
+                    <div className={`relative z-10 flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+                      isNext
+                        ? 'bg-teal-500/20 border-teal-500/60 shadow-[0_0_12px_rgba(20,184,166,0.4)]'
+                        : item.status === 'completed'
+                          ? 'bg-white/5 border-white/10'
+                          : 'bg-white/5 border-white/15'
+                    }`}>
+                      {itemIcon(item.type, 14)}
+                    </div>
+
+                    {/* Card */}
+                    <div className={`flex-1 rounded-2xl border p-4 transition-all ${
+                      isNext
+                        ? 'bg-teal-500/5 border-teal-500/30 shadow-[0_0_20px_rgba(20,184,166,0.08)]'
+                        : item.status === 'completed'
+                          ? 'bg-white/2 border-white/5 opacity-60'
+                          : 'bg-white/5 border-white/10 hover:border-white/20'
+                    }`}>
+                      {isNext && (
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                          <span className="text-teal-400 text-[8px] font-black uppercase tracking-[0.3em]">Up Next</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-white/30">
+                              {itemTypeLabel(item.type)}
+                            </span>
+                            {item.provider && (
+                              <>
+                                <span className="text-white/15">·</span>
+                                <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400/60">
+                                  {item.provider}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <h5 className={`font-black text-base leading-tight mb-1.5 ${item.status === 'completed' ? 'text-white/40' : 'text-white'}`}>
+                            {item.title}
+                          </h5>
+                          <p className="text-white/40 text-[10px] leading-relaxed">{contextMessage(item)}</p>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          {/* Time badge */}
+                          <div className="px-2.5 py-1 bg-black/40 border border-white/10 rounded-lg">
+                            <span className="text-white font-black text-sm font-mono">{item.time}</span>
+                          </div>
+                          {/* Status chip */}
+                          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border ${sc.chip}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                            <span className="text-[7px] font-black uppercase tracking-widest">{statusLabel(item.status)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Booking ref + cost */}
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                        <div className="flex items-center gap-1.5">
+                          <Hash size={10} className="text-white/20" />
+                          <span className="text-white/25 text-[8px] font-mono uppercase tracking-wider">
+                            Ref: {item.bookingRef}
+                          </span>
+                        </div>
+                        {item.cost != null && item.cost > 0 && (
+                          <span className="text-white/50 text-[9px] font-black">${item.cost}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Trip Card ───────────────────────────────────────────────────────────────
+
+const TripCard: React.FC<{
+  trip: TripItinerary;
+  onSelect: () => void;
+  onDelete: () => void;
+}> = ({ trip, onSelect, onDelete }) => {
+  const confirmed = trip.items.length;
+  const sc = tripStatusColors(trip.status);
+
+  return (
+    <GlassCard className="p-0 overflow-hidden border-white/10 hover:border-white/20 transition-all group cursor-pointer" onClick={onSelect}>
+      {/* Hero banner */}
+      <div className="relative h-28 bg-gradient-to-br from-teal-900/40 via-indigo-900/30 to-[#07161d] flex items-end p-5">
+        <div className="absolute inset-0 opacity-30 bg-gradient-to-r from-teal-500/20 to-indigo-500/10" />
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <span className={`px-2.5 py-1 rounded-lg border text-[7px] font-black uppercase tracking-widest ${sc}`}>
+            {tripStatusLabel(trip.status)}
+          </span>
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-white font-black text-xl tracking-tight leading-tight">{trip.destination}</h3>
+          <p className="text-white/40 text-[9px] font-black uppercase tracking-widest mt-0.5">{trip.title}</p>
+        </div>
+      </div>
+
+      {/* Meta row */}
+      <div className="p-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-white/40 text-[9px] font-black uppercase tracking-widest">
+          <span className="flex items-center gap-1.5">
+            <Calendar size={11} className="text-teal-400/60" />
+            {fmtRange(trip.startDate, trip.endDate)}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Ticket size={11} className="text-indigo-400/60" />
+            {confirmed} items confirmed
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-white font-black text-lg tracking-tighter">${trip.totalCost.toLocaleString()}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 text-white/20 hover:text-red-400 transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+          <ArrowRight size={16} className="text-white/30 group-hover:text-teal-400 group-hover:translate-x-1 transition-all" />
+        </div>
+      </div>
+    </GlassCard>
+  );
+};
+
+// ─── Existing booking card (extracted from original) ─────────────────────────
+
+const LegacyBookingCard: React.FC<{
+  booking: Booking;
+  isSelected: boolean;
+  onSelect: () => void;
+  showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+}> = ({ booking, isSelected, onSelect, showToast }) => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  const filteredBookings = filter === 'all'
-    ? bookings
-    : bookings.filter(b => b.type === filter);
-
   const getIcon = (type: Booking['type']) => {
-    switch(type) {
+    switch (type) {
       case 'flight': return <Plane className="text-sky-400" size={24} />;
       case 'hotel': return <Hotel className="text-amber-400" size={24} />;
       case 'restaurant': return <Utensils className="text-emerald-400" size={24} />;
@@ -36,302 +326,338 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ bookings }) => {
     }
   };
 
-  const getFilterLabel = (value: string) => {
-    switch (value) {
-      case 'flight':
-        return 'Flights';
-      case 'hotel':
-        return 'Hotels';
-      case 'restaurant':
-        return 'Dining';
-      case 'event':
-        return 'Events';
-      default:
-        return 'All';
-    }
-  };
-
-  const handleSyncNode = (id: string) => {
-    showToast(`Checking the latest status for booking ${id.slice(-4)}...`, 'info');
-    setTimeout(() => {
-      showToast('Booking status refreshed.', 'success');
-    }, 1500);
-  };
-
-  const handleAddToWallet = (booking: Booking) => {
-    setIsProcessing(`wallet-${booking.id}`);
+  const handleAddToWallet = () => {
+    setIsProcessing('wallet');
     setTimeout(() => {
       setIsProcessing(null);
       showToast(`${booking.title} Pass added to Apple Wallet!`, 'success');
     }, 1500);
   };
 
-  const handleDownloadReceipt = (booking: Booking) => {
-    setIsProcessing(`download-${booking.id}`);
+  const handleDownloadReceipt = () => {
+    setIsProcessing('download');
     setTimeout(() => {
       setIsProcessing(null);
-      const element = document.createElement('a');
+      const el = document.createElement('a');
       const file = new Blob([JSON.stringify(booking, null, 2)], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = `receipt-${booking.id}.txt`;
-      document.body.appendChild(element);
-      element.click();
+      el.href = URL.createObjectURL(file);
+      el.download = `receipt-${booking.id}.txt`;
+      document.body.appendChild(el);
+      el.click();
       showToast('Receipt downloaded.', 'success');
     }, 1200);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
-        <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">My Bookings</h2>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-white/40 text-[9px] uppercase font-black tracking-[0.4em]">Upcoming plans, passes, and receipts</p>
-            <div className="h-1 w-1 rounded-full bg-white/20" />
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-400 text-[8px] font-black uppercase tracking-widest">Ready To Use</span>
+    <GlassCard
+      className={`p-0 overflow-hidden border-white/10 group transition-all duration-500 ${
+        isSelected ? 'border-indigo-500/50 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'hover:border-white/20'
+      }`}
+    >
+      <div className="flex flex-col">
+        <div className="flex">
+          <div className="w-20 bg-white/5 p-5 flex flex-col items-center justify-center border-r border-white/5 shrink-0">
+            <div className="p-2.5 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform">
+              {getIcon(booking.type)}
+            </div>
+          </div>
+          <div className="flex-1 p-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-white font-black text-xl tracking-tight">{booking.title}</h4>
+                  <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                    <span className="text-emerald-400 text-[7px] font-black uppercase tracking-widest">Confirmed</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-white/40 text-[9px] font-black uppercase tracking-widest">
+                  <span className="flex items-center gap-1"><Clock size={10} /> {booking.date}</span>
+                  <span className="text-indigo-400">{booking.subtitle}</span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-white font-black text-2xl tracking-tighter">{booking.price}</p>
+                <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-emerald-500 text-[8px] font-black uppercase tracking-widest">Ready</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-4 border-t border-white/5">
+              <Hash size={11} className="text-indigo-500/40" />
+              <span className="text-white/30 font-mono text-[9px]">{booking.id.toUpperCase()}</span>
+              <span className="text-white/10 mx-1">·</span>
+              <span className="text-white/30 text-[9px]">{booking.details}</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="p-3 bg-white/5 border border-white/10 rounded-2xl text-white/40 hover:text-white transition-all"><Settings size={20} /></button>
-          <button className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-indigo-500/20">Refresh All</button>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide border-b border-white/5 px-2">
-        {['all', 'flight', 'hotel', 'restaurant', 'event'].map(item => (
-          <button
-            key={item}
-            onClick={() => setFilter(item)}
-            className={`whitespace-nowrap px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-              filter === item ? 'bg-white text-slate-900 border-white' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'
-            }`}
-          >
-            {getFilterLabel(item)}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-6">
-        {filteredBookings.length === 0 ? (
-          <GlassCard className="p-24 text-center border-dashed border-white/10 bg-transparent flex flex-col items-center gap-6">
-            <div className="w-24 h-24 bg-white/5 rounded-[3rem] flex items-center justify-center relative">
-              <Database className="text-white/10" size={48} />
-              <div className="absolute top-0 right-0 w-4 h-4 bg-amber-500 rounded-full animate-pulse border-4 border-[#020617]" />
-            </div>
-            <div>
-              <h3 className="text-white font-black uppercase tracking-widest text-sm mb-2">No Bookings Yet</h3>
-              <p className="text-white/30 text-xs max-w-xs mx-auto">Search for stays, flights, or events to start building your trip.</p>
-            </div>
-            <button className="px-10 py-4 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-[9px]">Start Exploring</button>
-          </GlassCard>
-        ) : (
-          filteredBookings.map((booking, idx) => (
-            <GlassCard
-              key={booking.id}
-              className={`p-0 overflow-hidden border-white/10 group animate-in slide-in-from-bottom-4 transition-all duration-500 ${selectedBookingId === booking.id ? 'border-indigo-500/50 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'hover:border-white/20'}`}
-              style={{ animationDelay: `${idx * 100}ms` }}
+        <div className="px-5 py-3 bg-black/30 border-t border-white/5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSelect}
+              className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                isSelected ? 'bg-white text-slate-950' : 'bg-white/5 text-white/40 border border-white/10 hover:text-white'
+              }`}
             >
-              <div className="flex flex-col">
-                <div className="flex flex-col lg:flex-row">
-                  <div className="lg:w-24 bg-white/5 p-6 flex flex-col items-center justify-between border-b lg:border-b-0 lg:border-r border-white/5 shrink-0">
-                    <div className="p-3 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform">
-                      {getIcon(booking.type)}
-                    </div>
-                    <div className="mt-4 hidden lg:block">
-                      <p className="text-[8px] font-black text-white/20 uppercase vertical-text tracking-[0.5em]">{booking.type}</p>
-                    </div>
-                  </div>
+              <QrCode size={12} /> {isSelected ? 'Hide Pass' : 'Show Pass'}
+            </button>
+            <button
+              onClick={() => showToast(`Refreshing booking ${booking.id.slice(-4)}…`, 'info')}
+              className="px-4 py-2 bg-white/5 border border-white/10 text-white/40 hover:text-white rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all"
+            >
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddToWallet}
+              className="px-4 py-2 bg-black text-white border border-white/20 rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-white hover:text-black transition-all"
+            >
+              {isProcessing === 'wallet' ? <RefreshCw className="animate-spin" size={12} /> : <Smartphone size={12} />}
+              Wallet
+            </button>
+            <button
+              onClick={handleDownloadReceipt}
+              className="p-2 bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 rounded-xl hover:bg-indigo-600/20 transition-all"
+            >
+              {isProcessing === 'download' ? <RefreshCw className="animate-spin" size={14} /> : <Download size={14} />}
+            </button>
+          </div>
+        </div>
 
-                  <div className="flex-1 p-8">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="text-white font-black text-3xl tracking-tighter uppercase">{booking.title}</h4>
-                          <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-                            <span className="text-emerald-400 text-[8px] font-black uppercase tracking-widest">Confirmed</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-white/40 text-[10px] font-black uppercase tracking-widest">
-                          <span className="flex items-center gap-1.5"><Clock size={12} /> Date: {booking.date}</span>
-                          <div className="w-1 h-1 rounded-full bg-white/10" />
-                          <span className="text-indigo-400">{booking.subtitle}</span>
-                          <div className="w-1 h-1 rounded-full bg-white/10" />
-                          <span className="flex items-center gap-1.5"><Globe size={12} /> Provider: {booking.gdsNode || 'Travel Book'}</span>
-                        </div>
-                      </div>
-                      <div className="text-left md:text-right shrink-0">
-                        <p className="text-white font-black text-4xl tracking-tighter">{booking.price}</p>
-                        <div className="flex items-center gap-2 md:justify-end mt-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-status" />
-                          <p className="text-emerald-500 text-[9px] font-black uppercase tracking-[0.2em]">Ready To Use</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-8 border-t border-white/5">
-                      <div className="space-y-1.5">
-                        <p className="text-white/20 text-[8px] font-black uppercase tracking-widest">Booking Reference</p>
-                        <div className="flex items-center gap-2 group/hash cursor-pointer">
-                          <Hash size={12} className="text-indigo-500/40" />
-                          <p className="text-white/60 font-mono text-[9px] truncate max-w-[120px] group-hover/hash:text-white transition-colors">
-                            {booking.id.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <p className="text-white/20 text-[8px] font-black uppercase tracking-widest">Trip Details</p>
-                        <p className="text-white/60 text-[10px] font-bold truncate max-w-[150px]">{booking.details}</p>
-                      </div>
-
-                      <div className="space-y-1.5 lg:col-span-2">
-                        <p className="text-white/20 text-[8px] font-black uppercase tracking-widest">Trip Status</p>
-                        <div className="flex gap-2">
-                          <div className="h-1 flex-1 bg-emerald-500 rounded-full" />
-                          <div className="h-1 flex-1 bg-emerald-500/20 rounded-full relative overflow-hidden">
-                            <div className="absolute inset-0 bg-emerald-500 w-[40%] animate-pulse" />
-                          </div>
-                          <div className="h-1 flex-1 bg-white/5 rounded-full" />
-                          <div className="h-1 flex-1 bg-white/5 rounded-full" />
-                        </div>
-                        <div className="flex justify-between text-[7px] font-black uppercase tracking-widest text-white/30">
-                          <span>Booked</span>
-                          <span className="text-emerald-400">Ready</span>
-                          <span>In Trip</span>
-                          <span>Done</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 bg-black/40 border-t border-white/5 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedBookingId(selectedBookingId === booking.id ? null : booking.id)}
-                      className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${selectedBookingId === booking.id ? 'bg-white text-slate-950 shadow-xl' : 'bg-white/5 text-white/40 border border-white/10 hover:text-white'}`}
-                    >
-                      <QrCode size={14} /> {selectedBookingId === booking.id ? 'Hide Pass' : 'Show Pass'}
-                    </button>
-                    <button
-                      onClick={() => handleSyncNode(booking.id)}
-                      className="px-6 py-3 bg-white/5 border border-white/10 text-white/40 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
-                    >
-                      <RefreshCw size={14} /> Refresh
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleAddToWallet(booking)}
-                      className="px-6 py-3 bg-black text-white border border-white/20 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white hover:text-black transition-all"
-                    >
-                      {isProcessing === `wallet-${booking.id}` ? <RefreshCw className="animate-spin" size={14} /> : <Smartphone size={14} />}
-                      Add to Apple Wallet
-                    </button>
-                    <button
-                      onClick={() => handleDownloadReceipt(booking)}
-                      className="p-3 bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 rounded-xl hover:bg-indigo-600/20 transition-all"
-                      title="Download Receipt"
-                    >
-                      {isProcessing === `download-${booking.id}` ? <RefreshCw className="animate-spin" size={18} /> : <Download size={18} />}
-                    </button>
-                    <button className="px-6 py-3 bg-red-600/10 border border-red-600/20 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all">
-                      <Trash2 size={14} /> Cancel
-                    </button>
-                  </div>
-                </div>
-
-                {selectedBookingId === booking.id && (
-                  <div className="p-8 border-t border-white/5 bg-black/60 animate-in slide-in-from-top-4 duration-500">
-                    <div className="flex flex-col md:flex-row items-center gap-12">
-                      <div className="shrink-0 p-6 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] relative">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(booking.id + booking.txHash)}&color=020617`}
-                          className="w-32 h-32"
-                          alt="Travel pass"
-                        />
-                        <div className="absolute -bottom-2 -right-2 bg-indigo-600 p-2 rounded-xl text-white shadow-xl">
-                          <ShieldCheck size={16} />
-                        </div>
-                      </div>
-                      <div className="flex-1 space-y-6">
-                        <div>
-                          <h5 className="text-white font-black text-xl uppercase tracking-tighter mb-2">Travel Pass</h5>
-                          <p className="text-white/40 text-sm leading-relaxed max-w-md">
-                            Show this QR code at check-in, the gate, or the front desk to access your booking quickly.
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                            <p className="text-white/20 text-[8px] font-black uppercase tracking-widest mb-1">Booking ID</p>
-                            <p className="text-white font-mono text-xs">{booking.id.toUpperCase()}</p>
-                          </div>
-                          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                            <p className="text-white/20 text-[8px] font-black uppercase tracking-widest mb-1">Reference</p>
-                            <p className="text-white font-mono text-xs">{booking.gdsNode || 'Travel Book'}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <button
-                            onClick={() => handleAddToWallet(booking)}
-                            className="flex-1 py-4 bg-black text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-2xl border border-white/20 hover:bg-white hover:text-black transition-all"
-                          >
-                            <Smartphone size={14} /> Add to Apple Wallet
-                          </button>
-                          <button
-                            onClick={() => handleDownloadReceipt(booking)}
-                            className="flex-1 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-2xl"
-                          >
-                            <Download size={14} /> Download Receipt
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+        {isSelected && (
+          <div className="p-6 border-t border-white/5 bg-black/60 animate-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center gap-8">
+              <div className="shrink-0 p-4 bg-white rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.08)]">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(booking.id + (booking.txHash || ''))}&color=020617`}
+                  className="w-24 h-24"
+                  alt="Travel pass"
+                />
               </div>
-            </GlassCard>
-          ))
+              <div>
+                <h5 className="text-white font-black text-sm uppercase tracking-wider mb-1">Travel Pass</h5>
+                <p className="text-white/40 text-xs mb-3">Show at check-in, gate, or front desk.</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAddToWallet}
+                    className="px-4 py-2 bg-black text-white border border-white/20 rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-white hover:text-black transition-all"
+                  >
+                    <Smartphone size={12} /> Add to Wallet
+                  </button>
+                  <button
+                    onClick={handleDownloadReceipt}
+                    className="px-4 py-2 bg-white text-slate-900 rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                  >
+                    <Download size={12} /> Receipt
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </GlassCard>
+  );
+};
+
+// ─── Main BookingsView ────────────────────────────────────────────────────────
+
+export const BookingsView: React.FC<BookingsViewProps> = ({ bookings }) => {
+  const { showToast } = useToast();
+  const { trips, deleteTrip } = useTrips();
+  const [activeTab, setActiveTab] = useState<'trips' | 'bookings'>('trips');
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [bookingFilter, setBookingFilter] = useState<string>('all');
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+
+  const selectedTrip = trips.find((t) => t.id === selectedTripId) || null;
+
+  const filteredBookings =
+    bookingFilter === 'all' ? bookings : bookings.filter((b) => b.type === bookingFilter);
+
+  const handleDeleteTrip = (id: string) => {
+    deleteTrip(id);
+    showToast('Trip removed.', 'info');
+    if (selectedTripId === id) setSelectedTripId(null);
+  };
+
+  return (
+    <div className="flex flex-col h-full animate-in fade-in duration-400">
+      {/* ── Fixed top section ── */}
+      <div className="flex-shrink-0">
+        {selectedTrip ? (
+          /* Trip detail header */
+          <div className="pt-6 pb-4 border-b border-white/5 mb-4">
+            <button
+              onClick={() => setSelectedTripId(null)}
+              className="flex items-center gap-2 text-white/40 hover:text-white transition-all font-black uppercase tracking-widest text-[9px] group mb-5"
+            >
+              <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+              All Trips
+            </button>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-black text-white tracking-tighter uppercase leading-tight">
+                  {selectedTrip.destination}
+                </h2>
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-[0.3em] mt-1">
+                  {fmtRange(selectedTrip.startDate, selectedTrip.endDate)} · {selectedTrip.items.length} items confirmed
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className="text-white font-black text-2xl tracking-tighter">
+                  ${selectedTrip.totalCost.toLocaleString()}
+                </span>
+                <span className={`px-2 py-0.5 rounded-lg border text-[7px] font-black uppercase tracking-widest ${tripStatusColors(selectedTrip.status)}`}>
+                  {tripStatusLabel(selectedTrip.status)}
+                </span>
+              </div>
+            </div>
+
+            {/* Share button */}
+            <button className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/40 text-[9px] font-black uppercase tracking-widest hover:text-white transition-all">
+              <Share2 size={12} /> Share Itinerary
+            </button>
+          </div>
+        ) : (
+          /* Main header + tabs */
+          <>
+            <div className="pt-6 pb-5 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-4xl font-black text-white tracking-tighter uppercase">My Trips</h2>
+                <p className="text-white/30 text-[9px] uppercase font-black tracking-[0.4em] mt-1">
+                  Itineraries, passes, and upcoming plans
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                <span className="text-teal-400 text-[8px] font-black uppercase tracking-widest">
+                  {trips.length} saved
+                </span>
+              </div>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex items-center gap-1.5 pb-4 border-b border-white/5">
+              {(['trips', 'bookings'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    activeTab === tab
+                      ? 'bg-white text-slate-900 border-white shadow-lg'
+                      : 'bg-white/5 text-white/40 border-white/10 hover:text-white'
+                  }`}
+                >
+                  {tab === 'trips' ? `Trips ${trips.length > 0 ? `(${trips.length})` : ''}` : 'Bookings'}
+                </button>
+              ))}
+
+              {activeTab === 'bookings' && (
+                <div className="flex items-center gap-1 ml-2">
+                  {['all', 'flight', 'hotel', 'restaurant', 'event'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setBookingFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-all ${
+                        bookingFilter === f
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white/5 text-white/30 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      {f === 'all' ? 'All' : f === 'restaurant' ? 'Dining' : f.charAt(0).toUpperCase() + f.slice(1) + 's'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      <GlassCard className="p-10 border-indigo-500/30 bg-indigo-600/5 relative overflow-hidden glass-glow">
-        <div className="absolute top-0 right-0 p-10 opacity-5">
-          <AlertTriangle size={140} className="text-white" />
-        </div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="max-w-md">
-            <h3 className="text-white font-black text-2xl uppercase tracking-tighter mb-4">Need Help With A Booking?</h3>
-            <p className="text-white/60 text-sm leading-relaxed mb-6">
-              If your plans change or something looks off, open support and we will walk you through the next step.
-            </p>
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 rounded-xl border border-white/5">
-                <CheckCircle2 size={12} className="text-emerald-400" />
-                <span className="text-white/40 text-[9px] font-black uppercase tracking-widest">Fast Support</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 rounded-xl border border-white/5">
-                <Activity size={12} className="text-indigo-400" />
-                <span className="text-white/40 text-[9px] font-black uppercase tracking-widest">Booking Updates</span>
-              </div>
-            </div>
-          </div>
-          <button className="px-10 py-5 bg-white text-slate-900 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-105 active:scale-95 transition-all">
-            Open Support
-          </button>
-        </div>
-      </GlassCard>
+      {/* ── Scrollable content ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto pt-2 pb-4">
+        {/* TRIPS: detail view */}
+        {selectedTrip && <TripTimeline trip={selectedTrip} />}
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        .vertical-text {
-          writing-mode: vertical-rl;
-          text-orientation: mixed;
-          transform: rotate(180deg);
-        }
-      ` }} />
+        {/* TRIPS: list view */}
+        {!selectedTrip && activeTab === 'trips' && (
+          <div className="space-y-4 pt-2">
+            {trips.length === 0 ? (
+              <GlassCard className="p-16 text-center border-dashed border-white/10 bg-transparent flex flex-col items-center gap-5">
+                <div className="w-20 h-20 bg-white/5 rounded-[2.5rem] flex items-center justify-center relative">
+                  <MapPin className="text-white/10" size={40} />
+                  <div className="absolute top-0 right-0 w-4 h-4 bg-teal-500 rounded-full animate-pulse border-4 border-[#07161d]" />
+                </div>
+                <div>
+                  <h3 className="text-white font-black uppercase tracking-widest text-sm mb-2">No Trips Yet</h3>
+                  <p className="text-white/30 text-xs max-w-xs mx-auto">
+                    Use the AI Trip Planner to build your first itinerary. Everything will appear here, ready to go.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
+                  <Sparkles size={12} className="text-teal-400" />
+                  <span className="text-teal-400 text-[9px] font-black uppercase tracking-widest">Plan a trip → Search → AI Trip Planner</span>
+                </div>
+              </GlassCard>
+            ) : (
+              trips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onSelect={() => setSelectedTripId(trip.id)}
+                  onDelete={() => handleDeleteTrip(trip.id)}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {/* BOOKINGS: legacy list */}
+        {!selectedTrip && activeTab === 'bookings' && (
+          <div className="space-y-4 pt-2">
+            {filteredBookings.length === 0 ? (
+              <GlassCard className="p-16 text-center border-dashed border-white/10 bg-transparent flex flex-col items-center gap-5">
+                <Database className="text-white/10" size={48} />
+                <div>
+                  <h3 className="text-white font-black uppercase tracking-widest text-sm mb-2">No Bookings Yet</h3>
+                  <p className="text-white/30 text-xs max-w-xs mx-auto">
+                    Search for stays, flights, or events to start building your trip.
+                  </p>
+                </div>
+              </GlassCard>
+            ) : (
+              filteredBookings.map((booking) => (
+                <LegacyBookingCard
+                  key={booking.id}
+                  booking={booking}
+                  isSelected={selectedBookingId === booking.id}
+                  onSelect={() => setSelectedBookingId(selectedBookingId === booking.id ? null : booking.id)}
+                  showToast={showToast}
+                />
+              ))
+            )}
+
+            {/* Support banner */}
+            <GlassCard className="p-8 border-indigo-500/20 bg-indigo-600/5 relative overflow-hidden mt-4">
+              <div className="absolute top-0 right-0 p-8 opacity-5">
+                <AlertTriangle size={100} />
+              </div>
+              <div className="relative z-10 flex items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-white font-black text-lg uppercase tracking-tight mb-2">Need Help?</h3>
+                  <p className="text-white/50 text-xs">Changes, cancellations, or questions — we have got you covered.</p>
+                </div>
+                <button className="px-6 py-3 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[9px] shadow-lg hover:scale-105 active:scale-95 transition-all whitespace-nowrap">
+                  Open Support
+                </button>
+              </div>
+            </GlassCard>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

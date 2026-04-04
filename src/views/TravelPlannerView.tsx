@@ -14,11 +14,14 @@ import { generateItinerary } from '@/services/geminiService';
 import { validateInventory } from '@/services/bookingService';
 import { MapModal } from '@/components/MapModal';
 import { User } from '@/types';
+import { useTrips, generateBookingRef } from '@/hooks/useTripStore';
+import { TripItinerary, TripItem, TripItemType } from '@/types/trip';
 
 interface TravelPlannerViewProps {
   onBack: () => void;
   onBookClick?: (business: User) => void;
   onShareAsPost?: (content: string, isBuddyRequest: boolean) => void;
+  onTripSaved?: () => void;
 }
 
 interface TravelData {
@@ -41,7 +44,138 @@ interface TravelData {
   sources?: { title: string, uri: string }[];
 }
 
-export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, onBookClick, onShareAsPost }) => {
+// ─── Trip conversion helpers ─────────────────────────────────────────────────
+
+function addDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function formatDateISO(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function parseTime(t: string): string {
+  if (!t) return '09:00';
+  const m = t.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!m) return '09:00';
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ap = (m[3] || '').toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${min}`;
+}
+
+function mapCategory(cat: string): TripItemType {
+  const c = (cat || '').toLowerCase();
+  if (c.includes('dining') || c.includes('food') || c.includes('restaurant')) return 'activity';
+  if (c.includes('transport') || c.includes('bus') || c.includes('train')) return 'transport';
+  if (c.includes('taxi') || c.includes('cab') || c.includes('ride')) return 'taxi';
+  if (c.includes('hotel') || c.includes('stay') || c.includes('accommodation')) return 'hotel_checkin';
+  if (c.includes('event') || c.includes('show') || c.includes('concert') || c.includes('theater')) return 'event';
+  return 'activity';
+}
+
+function convertToTripItinerary(
+  travelData: TravelData,
+  destination: string,
+  duration: string,
+  departureCity: string,
+): TripItinerary {
+  const numDays = duration.includes('Week') ? 7 : duration.includes('5') ? 5 : 3;
+  const startDate = addDays(new Date(), 3);
+  const items: TripItem[] = [];
+
+  const makeItem = (
+    type: TripItemType,
+    title: string,
+    date: Date,
+    time: string,
+    extra: Partial<TripItem> = {},
+  ): TripItem => ({
+    id: `ti-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type,
+    title,
+    date: formatDateISO(date),
+    time,
+    status: 'upcoming',
+    bookingRef: generateBookingRef(),
+    ...extra,
+  });
+
+  // Departure taxi
+  items.push(makeItem('taxi', `Taxi to ${departureCity || 'Airport'}`, startDate, '07:30', {
+    description: 'Driver will be waiting at your door',
+    isRide: true,
+  }));
+
+  // Outbound flight
+  if (travelData.flights) {
+    items.push(makeItem('flight', `Flight to ${destination}`, startDate, '10:00', {
+      provider: travelData.flights.airline,
+      cost: travelData.flights.estimatedPrice,
+      description: `Duration: ${travelData.flights.duration}`,
+    }));
+  }
+
+  // Hotel check-in day 0
+  items.push(makeItem('hotel_checkin', `Check in — ${destination}`, startDate, '15:00', {
+    description: 'Hotel is expecting your arrival',
+    cost: travelData.budgetBreakdown.accommodation,
+  }));
+
+  // Activities per day
+  (travelData.days || []).forEach((day, dayIdx) => {
+    const dayDate = addDays(startDate, dayIdx);
+    (day.items || []).forEach((item: any) => {
+      items.push(makeItem(
+        mapCategory(item.category || ''),
+        item.activity || item.name || 'Activity',
+        dayDate,
+        parseTime(item.time),
+        {
+          description: item.description,
+          cost: item.estimatedCost,
+        },
+      ));
+    });
+  });
+
+  // Hotel checkout on last day
+  const checkoutDate = addDays(startDate, numDays - 1);
+  items.push(makeItem('hotel_checkout', `Checkout — ${destination}`, checkoutDate, '11:00', {
+    description: 'Checkout by 11:00',
+  }));
+
+  // Return taxi from airport
+  const returnDate = addDays(startDate, numDays - 1);
+  items.push(makeItem('taxi', `Taxi from Airport — Home`, returnDate, '18:00', {
+    description: 'Driver will be waiting for you',
+    isRide: true,
+  }));
+
+  // Sort by date+time
+  items.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+
+  return {
+    id: `trip-${Date.now()}`,
+    title: `${destination} ${duration} Trip`,
+    destination,
+    startDate: formatDateISO(startDate),
+    endDate: formatDateISO(addDays(startDate, numDays - 1)),
+    totalCost: travelData.totalEstimatedBudget,
+    status: 'upcoming',
+    items,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, onBookClick, onShareAsPost, onTripSaved }) => {
+  const { addTrip } = useTrips();
   const [destination, setDestination] = useState('');
   const [departureCity, setDepartureCity] = useState('');
   const [interests, setInterests] = useState('');
@@ -52,6 +186,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
   const [travelData, setTravelData] = useState<TravelData | null>(null);
   const [activeMapLocation, setActiveMapLocation] = useState<string | null>(null);
   const [searchPhase, setSearchPhase] = useState('');
+  const [tripSaved, setTripSaved] = useState(false);
 
   const handleGenerate = async () => {
     if (!destination || !interests) return;
@@ -68,6 +203,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
     setLoading(true);
     setError(null);
     setTravelData(null);
+    setTripSaved(false);
 
     setSearchPhase('Building your trip plan...');
     await new Promise(r => setTimeout(r, 700));
@@ -110,6 +246,13 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
     } else {
       setError('That option is not available right now. Please try another one.');
     }
+  };
+
+  const handleBookWholeJourney = () => {
+    if (!travelData) return;
+    const itinerary = convertToTripItinerary(travelData, destination, duration, departureCity);
+    addTrip(itinerary);
+    setTripSaved(true);
   };
 
   const handleBuddyRequest = () => {
@@ -376,20 +519,53 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
             </div>
           )}
 
-          <div className="pt-10 flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => onShareAsPost?.(`I just planned a ${duration} trip to ${destination} with Travel Book.`, false)}
-              className="flex-1 py-6 bg-white text-slate-950 rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] transition-all"
-            >
-              <Share2 size={18} /> Share Plan
-            </button>
-            <button
-              onClick={handleBuddyRequest}
-              className="flex-1 py-6 bg-white/5 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 border border-white/10 hover:bg-white/10 transition-all"
-            >
-              <Users size={18} /> Find Travel Buddies
-            </button>
-          </div>
+          {/* Book Whole Journey */}
+          {tripSaved ? (
+            <div className="pt-10 animate-in slide-in-from-bottom-4 duration-500">
+              <GlassCard className="p-8 border-teal-500/40 bg-teal-500/5 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-teal-500/20 rounded-2xl">
+                    <CheckCircle2 className="text-teal-400" size={28} />
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-sm uppercase tracking-widest">Trip Saved!</p>
+                    <p className="text-white/50 text-xs mt-0.5">
+                      Your full itinerary is ready in My Trips — everything is pre-arranged.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onTripSaved}
+                  className="flex-shrink-0 px-8 py-4 bg-teal-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-lg shadow-teal-500/20 hover:scale-[1.02] transition-all"
+                >
+                  View in Trips <ArrowRight size={14} />
+                </button>
+              </GlassCard>
+            </div>
+          ) : (
+            <div className="pt-10">
+              <button
+                onClick={handleBookWholeJourney}
+                className="w-full py-6 bg-gradient-to-r from-teal-500 to-indigo-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-teal-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mb-4"
+              >
+                <Save size={20} /> Book Whole Journey
+              </button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => onShareAsPost?.(`I just planned a ${duration} trip to ${destination} with Travel Book.`, false)}
+                  className="flex-1 py-5 bg-white text-slate-950 rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] transition-all"
+                >
+                  <Share2 size={18} /> Share Plan
+                </button>
+                <button
+                  onClick={handleBuddyRequest}
+                  className="flex-1 py-5 bg-white/5 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 border border-white/10 hover:bg-white/10 transition-all"
+                >
+                  <Users size={18} /> Find Travel Buddies
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

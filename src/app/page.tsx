@@ -608,7 +608,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#07161d] text-white">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#07161d] text-white">
       <div className="absolute left-[-8rem] top-[-6rem] h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="absolute right-[-5rem] top-12 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
       <div className="absolute bottom-[-8rem] left-1/3 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
@@ -658,7 +658,7 @@ const AppContent: React.FC = () => {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-4 py-8 pb-32 sm:px-6 lg:px-8">
+      <main className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-28">
         {currentRoute === AppRoute.HOME && (
           <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} />
         )}

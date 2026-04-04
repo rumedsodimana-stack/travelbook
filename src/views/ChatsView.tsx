@@ -190,7 +190,7 @@ export const ChatsView: React.FC<ChatsViewProps> = ({ chats, setChats, currentUs
   };
 
   return (
-    <div className="h-[calc(100vh-180px)] flex gap-6 animate-in fade-in duration-500">
+    <div className="h-full flex gap-6 px-4 pt-6 animate-in fade-in duration-500">
       {/* Sidebar */}
       <div className={`w-full lg:w-[340px] flex flex-col gap-4 ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Search */}

@@ -27,7 +27,7 @@ import {
   SUPPLIER_CATEGORY_BY_TYPE,
   SUPPLIER_TYPE_OPTIONS,
   TRAVELER_STYLE_OPTIONS,
-} from '@/onboardingConfig';
+} from '@/config/onboarding';
 import { MembershipBadge } from '@/components/MembershipBadge';
 import { resolveIdentityLabel } from '@/services/identityService';
 import { isHotelInvite, isProviderInvite, TravelBookInviteContext } from '@/services/providerInviteService';

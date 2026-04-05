@@ -20,6 +20,7 @@ import { ProfileView } from '@/views/ProfileView';
 import { SearchView } from '@/views/SearchView';
 import { SettingsView } from '@/views/SettingsView';
 import { TravelPlannerView } from '@/views/TravelPlannerView';
+import { AIPlannerView } from '@/views/AIPlannerView';
 import { clearTravelBookSession, getPersistedTravelBookSession, updateStoredTravelBookUser } from '@/services/accountService';
 import { generateMockUser, getMassiveFeed } from '@/services/dataFactory';
 import { hydrateTravelBookUser, resolveIdentityKind } from '@/services/identityService';
@@ -264,6 +265,10 @@ const ROUTE_META: Partial<Record<AppRoute, { title: string; subtitle: string }>>
     title: 'Admin',
     subtitle: 'Admin tools, AI connections, and system monitoring.',
   },
+  [AppRoute.AI_PLANNER]: {
+    title: 'AI Trip Planner',
+    subtitle: 'Build a full itinerary with AI — flights, hotels, activities, and timing.',
+  },
 };
 
 const AppContent: React.FC = () => {
@@ -484,6 +489,11 @@ const AppContent: React.FC = () => {
     setCurrentRoute(AppRoute.PLANNER);
   };
 
+  const openAIPlanner = () => {
+    setPreviousRoute(currentRoute);
+    setCurrentRoute(AppRoute.AI_PLANNER);
+  };
+
   const openComposer = (content = '', type: Post['postType'] = 'story') => {
     setComposeContent(content);
     setComposeType(type);
@@ -660,11 +670,11 @@ const AppContent: React.FC = () => {
 
       <main className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-28 px-4 sm:px-6 lg:px-8">
         {currentRoute === AppRoute.HOME && (
-          <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} />
+          <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} onNavigateToAIPlanner={openAIPlanner} />
         )}
 
         {currentRoute === AppRoute.SEARCH && (
-          <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onBookClick={openBooking} />
+          <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onNavigateToAIPlanner={openAIPlanner} onBookClick={openBooking} />
         )}
 
         {currentRoute === AppRoute.GAMES && (
@@ -706,6 +716,12 @@ const AppContent: React.FC = () => {
             onBookClick={openBooking}
             onShareAsPost={handlePlannerShare}
             onTripSaved={() => setCurrentRoute(AppRoute.BOOKINGS)}
+          />
+        )}
+
+        {currentRoute === AppRoute.AI_PLANNER && (
+          <AIPlannerView
+            onBack={() => setCurrentRoute(previousRoute)}
           />
         )}
 

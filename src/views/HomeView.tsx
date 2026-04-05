@@ -14,7 +14,6 @@ import { UserLabel } from '@/components/UserLabel';
 import { getMassiveFeed } from '@/services/dataFactory';
 
 interface HomeViewProps {
-  onNavigateToAIPlanner?: () => void;
   posts: Post[];
   setPosts: React.Dispatch<React.SetStateAction<Post[]>>;
   onPostClick: (post: Post) => void;
@@ -56,7 +55,7 @@ const TRENDING_DESTINATIONS = [
   '🇲🇦 Marrakesh',
 ];
 
-export const HomeView: React.FC<HomeViewProps> = ({ posts, setPosts, onPostClick, onProfileClick, onNavigateToAIPlanner }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ posts, setPosts, onPostClick, onProfileClick }) => {
   const [activeMapLocation, setActiveMapLocation] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -142,30 +141,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ posts, setPosts, onPostClick
             ))}
           </div>
         </GlassCard>
-
-        {/* AI Trip Planner CTA */}
-        {onNavigateToAIPlanner && (
-          <button
-            onClick={onNavigateToAIPlanner}
-            className="w-full text-left rounded-[2.5rem] border border-teal-500/30 bg-gradient-to-r from-teal-500/15 via-cyan-500/10 to-teal-500/5 p-5 shadow-[0_0_30px_rgba(20,184,166,0.12)] backdrop-blur-xl transition-all hover:border-teal-500/50 hover:shadow-[0_0_40px_rgba(20,184,166,0.2)] hover:scale-[1.01] active:scale-100"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-400 shadow-lg shadow-teal-500/30 text-2xl">
-                  ✨
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-teal-400 mb-0.5">New Feature</p>
-                  <p className="text-base font-black text-white leading-tight">Plan My Trip with AI</p>
-                  <p className="text-xs text-white/50 mt-0.5">Flights · Hotels · Activities · Full timeline</p>
-                </div>
-              </div>
-              <div className="flex-shrink-0 rounded-2xl bg-teal-500 px-4 py-2 text-xs font-black text-white shadow-lg shadow-teal-500/30">
-                Try it →
-              </div>
-            </div>
-          </button>
-        )}
 
         {/* Post Feed */}
         {posts.map((post) => (

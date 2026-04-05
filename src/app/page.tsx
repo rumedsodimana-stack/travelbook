@@ -670,11 +670,11 @@ const AppContent: React.FC = () => {
 
       <main className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-28 px-4 sm:px-6 lg:px-8">
         {currentRoute === AppRoute.HOME && (
-          <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} onNavigateToAIPlanner={openAIPlanner} />
+          <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} />
         )}
 
         {currentRoute === AppRoute.SEARCH && (
-          <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onNavigateToAIPlanner={openAIPlanner} onBookClick={openBooking} />
+          <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onBookClick={openBooking} />
         )}
 
         {currentRoute === AppRoute.GAMES && (

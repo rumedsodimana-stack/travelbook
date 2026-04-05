@@ -15,7 +15,6 @@ import { UserLabel } from '@/components/UserLabel';
 interface SearchViewProps {
   onProfileClick: (user: User) => void;
   onNavigateToPlanner: () => void;
-  onNavigateToAIPlanner?: () => void;
   onBookClick?: (business: User) => void;
   onTransportRide?: () => void;
 }
@@ -29,7 +28,7 @@ const CATEGORY_ITEMS = [
   { id: 'entertainment', label: 'Entertainment', icon: Sparkles, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
 ];
 
-export const SearchView: React.FC<SearchViewProps> = ({ onProfileClick, onNavigateToPlanner, onNavigateToAIPlanner, onBookClick, onTransportRide }) => {
+export const SearchView: React.FC<SearchViewProps> = ({ onProfileClick, onNavigateToPlanner, onBookClick, onTransportRide }) => {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -98,30 +97,6 @@ export const SearchView: React.FC<SearchViewProps> = ({ onProfileClick, onNaviga
               </button>
             </div>
           </GlassCard>
-
-          {/* AI Trip Planner CTA */}
-          {onNavigateToAIPlanner && (
-            <button
-              onClick={onNavigateToAIPlanner}
-              className="w-full text-left rounded-[2.5rem] border border-teal-500/40 bg-gradient-to-br from-teal-500/15 via-cyan-500/8 to-transparent p-6 shadow-[0_0_40px_rgba(20,184,166,0.15)] backdrop-blur-xl transition-all duration-300 hover:border-teal-400/60 hover:shadow-[0_0_60px_rgba(20,184,166,0.25)] hover:scale-[1.01] active:scale-100 group"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-400 shadow-lg shadow-teal-500/40 text-2xl">
-                  ✨
-                </div>
-                <div className="rounded-xl border border-teal-500/30 bg-teal-500/15 px-3 py-1">
-                  <span className="text-[8px] font-black uppercase tracking-[0.2em] text-teal-400">AI-Powered · New</span>
-                </div>
-              </div>
-              <h2 className="text-2xl font-black text-white tracking-tight mb-1">AI Trip Planner</h2>
-              <p className="text-sm text-white/55 leading-relaxed mb-5 max-w-xs">
-                Enter your destination, budget, and dates — get a full scrollable itinerary with flights, hotels, and activities. Swap any option and timing updates automatically.
-              </p>
-              <div className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-400 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-teal-500/30 group-hover:shadow-teal-500/50 transition-shadow">
-                Build My Trip with AI <ArrowRight size={14} />
-              </div>
-            </button>
-          )}
 
           <form onSubmit={onMainSearchSubmit} className="relative z-30">
             <div className="relative">

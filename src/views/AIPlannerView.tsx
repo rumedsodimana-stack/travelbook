@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GlassCard } from '@/components/GlassCard';
 import {
   Sparkles, ChevronLeft, Star,
-  RefreshCw, ArrowRight, Clock, Zap, CheckCircle2,
+  RefreshCw, ArrowRight, Clock, Zap, CheckCircle2, X,
 } from 'lucide-react';
 import { PlanItem, PlanItemCategory, TripPlan, AppRoute } from '@/types';
 import { generateTripPlan, DEMO_PRESET, TripPlanInput } from '@/services/tripPlannerService';
@@ -66,7 +66,7 @@ const OptionCard: React.FC<OptionCardProps> = ({ option, isSelected, currency, o
   <div className={`relative flex-shrink-0 w-64 rounded-3xl border p-4 transition-all duration-300 cursor-pointer select-none
     ${isSelected
       ? 'border-teal-500 bg-teal-500/10 shadow-[0_0_20px_rgba(20,184,166,0.3)] ring-1 ring-teal-500/60'
-      : 'border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
+      : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
     onClick={onSelect}>
     {/* Image placeholder */}
     <div className="relative mb-3 h-28 w-full overflow-hidden rounded-2xl bg-white/8">
@@ -106,9 +106,9 @@ const OptionCard: React.FC<OptionCardProps> = ({ option, isSelected, currency, o
       )}
     </div>
     <button onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      className={`mt-2.5 w-full rounded-2xl py-2 text-xs font-bold transition-all ${isSelected
-        ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
-        : 'border border-white/20 bg-white/5 text-white/70 hover:bg-white/10'}`}>
+      className={`mt-2.5 w-full rounded-xl py-2 text-xs font-semibold transition-all ${isSelected
+        ? 'bg-teal-500 hover:bg-teal-400 text-black shadow-lg shadow-teal-500/30'
+        : 'border border-white/10 bg-white/10 hover:bg-white/20 text-white rounded-xl'}`}>
       {isSelected ? '✓ Selected' : 'SELECT'}
     </button>
   </div>
@@ -129,6 +129,62 @@ const TravelConnector: React.FC<{ minutes: number }> = ({ minutes }) => {
   );
 };
 
+// ─── Transport card ───────────────────────────────────────────────────────────
+const TRANSPORT_ICONS = ['🚗', '🚕', '🚌'];
+const TRANSPORT_LABELS = ['Ride', 'Taxi', 'Transit'];
+
+interface TransportCardProps {
+  item: PlanItem;
+  itemIndex: number;
+  currency: string;
+  onSelectOption: (itemIndex: number, optionIndex: number) => void;
+  onRemove: () => void;
+}
+const TransportCard: React.FC<TransportCardProps> = ({ item, itemIndex, currency, onSelectOption, onRemove }) => {
+  const selectedOpt = item.options[item.selectedOptionIndex];
+  return (
+    <div className="flex items-stretch gap-2 px-1 my-1">
+      {/* Vertical connector line */}
+      <div className="flex flex-col items-center w-5 flex-shrink-0 pt-1 pb-1">
+        <div className="w-px flex-1 bg-teal-500/25" />
+        <span className="text-base leading-none my-1">{TRANSPORT_ICONS[item.selectedOptionIndex] ?? '🚗'}</span>
+        <div className="w-px flex-1 bg-teal-500/25" />
+      </div>
+      {/* Card body */}
+      <div className="flex-1 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 min-w-0">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">TRANSFER</p>
+          <p className="text-xs text-white/60 truncate">{selectedOpt?.title ?? 'Transfer'}</p>
+          <p className="text-[10px] text-white/35 mt-0.5">
+            <Clock size={9} className="inline mr-0.5" />{fmtTime(item.scheduledAt)} · {fmtDuration(item.durationMinutes)}
+          </p>
+        </div>
+        {/* Option pill buttons */}
+        <div className="flex gap-1.5 flex-shrink-0">
+          {item.options.map((opt, oi) => (
+            <button key={opt.id} onClick={() => onSelectOption(itemIndex, oi)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                oi === item.selectedOptionIndex
+                  ? 'bg-teal-500/20 border border-teal-400/50 text-teal-300'
+                  : 'bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white/70'
+              }`}>
+              <span>{TRANSPORT_ICONS[oi] ?? '🚗'}</span>
+              <span>{TRANSPORT_LABELS[oi] ?? opt.title.split(' ')[0]}</span>
+              <span className="text-white/40">{opt.price === 0 ? '' : ` $${Math.round(opt.price)}`}</span>
+            </button>
+          ))}
+        </div>
+        {/* Remove button */}
+        <button onClick={onRemove}
+          className="flex-shrink-0 ml-1 rounded-xl p-1.5 text-white/25 hover:bg-white/10 hover:text-white/60 transition-all"
+          title="Remove this transfer">
+          <X size={12} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Plan card ────────────────────────────────────────────────────────────────
 interface PlanCardProps {
   item: PlanItem;
@@ -136,8 +192,9 @@ interface PlanCardProps {
   currency: string;
   highlightedIndex: number | null;
   onSelectOption: (itemIndex: number, optionIndex: number) => void;
+  onRemove?: () => void;
 }
-const PlanCard: React.FC<PlanCardProps> = ({ item, itemIndex, currency, highlightedIndex, onSelectOption }) => {
+const PlanCard: React.FC<PlanCardProps> = ({ item, itemIndex, currency, highlightedIndex, onSelectOption, onRemove }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isHighlighted = highlightedIndex === itemIndex;
   const selectedOpt = item.options[item.selectedOptionIndex];
@@ -168,10 +225,19 @@ const PlanCard: React.FC<PlanCardProps> = ({ item, itemIndex, currency, highligh
             {item.endAt && <span className="text-white/35"> → {fmtTime(item.endAt)}</span>}
           </p>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-black text-white">{fmtCurrency(selectedOpt?.price ?? 0, currency)}</p>
-          {selectedOpt?.duration && (
-            <p className="text-[10px] text-white/40">{fmtDuration(selectedOpt.duration)}</p>
+        <div className="flex items-start gap-2 flex-shrink-0">
+          <div className="text-right">
+            <p className="text-sm font-black text-white">{fmtCurrency(selectedOpt?.price ?? 0, currency)}</p>
+            {selectedOpt?.duration && (
+              <p className="text-[10px] text-white/40">{fmtDuration(selectedOpt.duration)}</p>
+            )}
+          </div>
+          {!item.isRequired && onRemove && (
+            <button onClick={onRemove}
+              className="mt-0.5 rounded-xl p-1.5 text-white/25 hover:bg-white/10 hover:text-white/70 transition-all"
+              title="Remove this item">
+              <X size={14} />
+            </button>
           )}
         </div>
       </div>
@@ -226,7 +292,7 @@ interface InputScreenProps {
   loading: boolean;
 }
 const InputScreen: React.FC<InputScreenProps> = ({ form, setForm, onSubmit, onDemo, loading }) => {
-  const inputCls = "w-full rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-teal-500/60 focus:ring-1 focus:ring-teal-500/30 transition-all";
+  const inputCls = "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/20 transition-all";
   const labelCls = "block text-xs font-bold uppercase tracking-widest text-white/50 mb-1.5";
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
@@ -285,7 +351,7 @@ const InputScreen: React.FC<InputScreenProps> = ({ form, setForm, onSubmit, onDe
           <label className={labelCls}>Total budget</label>
           <div className="flex gap-2">
             <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
-              className="rounded-2xl border border-white/15 bg-white/8 px-3 py-3 text-sm text-white outline-none focus:border-teal-500/60">
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none focus:border-teal-400/50">
               {['USD', 'EUR', 'GBP', 'AED', 'LKR'].map(c => <option key={c} value={c} className="bg-[#07161d]">{c}</option>)}
             </select>
             <input type="number" className={`${inputCls} flex-1`} placeholder="3000"
@@ -299,7 +365,7 @@ const InputScreen: React.FC<InputScreenProps> = ({ form, setForm, onSubmit, onDe
             value={form.preferences || ''} onChange={e => setForm(f => ({ ...f, preferences: e.target.value }))} />
         </div>
         <button onClick={onSubmit} disabled={loading || !form.destination || !form.originCity || !form.startDate || !form.endDate}
-          className="w-full rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-400 py-4 text-base font-black text-white shadow-lg shadow-teal-500/30 transition-all hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          className="w-full rounded-xl bg-teal-500 hover:bg-teal-400 py-4 text-base font-semibold text-black shadow-lg shadow-teal-500/30 transition-all hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {loading ? <><div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Building…</> : <><Sparkles size={18} />Build My Trip</>}
         </button>
       </div>
@@ -366,7 +432,9 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [highlightedIdx, setHighlightedIdx] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [lastRemoved, setLastRemoved] = useState<{ item: PlanItem; origItems: PlanItem[] } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startLoadingCycle = useCallback(() => {
     setLoadingMsgIdx(0);
@@ -377,7 +445,10 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
-  useEffect(() => () => stopLoadingCycle(), [stopLoadingCycle]);
+  useEffect(() => () => {
+    stopLoadingCycle();
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+  }, [stopLoadingCycle]);
 
   const runPlan = useCallback(async (input: TripPlanInput) => {
     setStep('loading');
@@ -414,6 +485,46 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
     setTimeout(() => setHighlightedIdx(null), affected.length * 80 + 800);
   }, [items]);
 
+  const handleRemove = useCallback((itemId: string) => {
+    const itemIdx = items.findIndex(it => it.id === itemId);
+    if (itemIdx === -1) return;
+    const removedItem = items[itemIdx];
+    const newItems = items.filter(it => it.id !== itemId);
+    // Re-cascade timing from the position of the removed item
+    let cascaded = newItems;
+    if (itemIdx > 0 && itemIdx < newItems.length) {
+      cascaded = [...newItems];
+      for (let i = itemIdx; i < cascaded.length; i++) {
+        const prev = cascaded[i - 1];
+        const prevEndMs = prev.endAt
+          ? new Date(prev.endAt).getTime()
+          : new Date(prev.scheduledAt).getTime() + prev.durationMinutes * 60_000;
+        const travelMs = (cascaded[i].travelTimeTo ?? 0) * 60_000;
+        const newStart = prevEndMs + travelMs;
+        const dur = cascaded[i].durationMinutes;
+        cascaded[i] = {
+          ...cascaded[i],
+          scheduledAt: new Date(newStart).toISOString(),
+          endAt: new Date(newStart + dur * 60_000).toISOString(),
+        };
+      }
+    }
+    setLastRemoved({ item: removedItem, origItems: items });
+    setItems(cascaded);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => {
+      setLastRemoved(null);
+      undoTimerRef.current = null;
+    }, 4000);
+  }, [items]);
+
+  const handleUndo = useCallback(() => {
+    if (!lastRemoved) return;
+    setItems(lastRemoved.origItems);
+    setLastRemoved(null);
+    if (undoTimerRef.current) { clearTimeout(undoTimerRef.current); undoTimerRef.current = null; }
+  }, [lastRemoved]);
+
   const handleBookAll = useCallback(() => {
     // No-op for now — could integrate with booking system
     alert('Booking integration coming soon! Each selected option would be confirmed through the TravelBook booking flow.');
@@ -431,7 +542,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
       {step !== 'loading' && (
         <div className="flex items-center gap-3 px-4 pt-4 pb-2 flex-shrink-0">
           <button onClick={step === 'plan' ? handleEdit : onBack}
-            className="flex items-center gap-1.5 rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 transition-colors">
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 hover:bg-white/20 px-3 py-2 text-xs font-semibold text-white transition-colors">
             <ChevronLeft size={14} />{step === 'plan' ? 'Edit Plan' : 'Back'}
           </button>
           {step === 'plan' && plan && (
@@ -461,7 +572,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
           <h3 className="text-xl font-black text-white">Could not build your trip</h3>
           <p className="text-sm text-white/50 max-w-xs">{errorMsg}</p>
           <button onClick={() => setStep('input')}
-            className="flex items-center gap-2 rounded-2xl bg-teal-500 px-6 py-3 text-sm font-bold text-white">
+            className="flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 px-6 py-3 text-sm font-semibold text-black">
             <RefreshCw size={14} />Try Again
           </button>
         </div>
@@ -473,7 +584,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
           <PlanHeader plan={plan} items={items} onEdit={handleEdit} onBookAll={handleBookAll} />
           {/* AI Summary */}
           <div className="px-4 py-3 mx-auto w-full max-w-lg flex-shrink-0">
-            <div className="rounded-2xl border border-teal-500/20 bg-teal-500/8 px-4 py-3">
+            <div className="rounded-2xl border border-teal-400/20 bg-teal-400/10 px-4 py-3">
               <p className="text-[11px] font-black uppercase tracking-widest text-teal-400 mb-1">AI Overview</p>
               <p className="text-xs text-white/65 leading-relaxed">{plan.aiSummary}</p>
             </div>
@@ -483,9 +594,27 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
             <div className="mx-auto max-w-lg space-y-0">
               {items.map((item, idx) => (
                 <React.Fragment key={item.id}>
-                  {idx > 0 && item.travelTimeTo ? <TravelConnector minutes={item.travelTimeTo} /> : <div className="h-2" />}
-                  <PlanCard item={item} itemIndex={idx} currency={plan.budgetCurrency}
-                    highlightedIndex={highlightedIdx} onSelectOption={handleSelectOption} />
+                  {item.category === 'transport' ? (
+                    <TransportCard
+                      item={item}
+                      itemIndex={idx}
+                      currency={plan.budgetCurrency}
+                      onSelectOption={handleSelectOption}
+                      onRemove={() => handleRemove(item.id)}
+                    />
+                  ) : (
+                    <>
+                      {idx > 0 && item.travelTimeTo ? <TravelConnector minutes={item.travelTimeTo} /> : <div className="h-2" />}
+                      <PlanCard
+                        item={item}
+                        itemIndex={idx}
+                        currency={plan.budgetCurrency}
+                        highlightedIndex={highlightedIdx}
+                        onSelectOption={handleSelectOption}
+                        onRemove={!item.isRequired ? () => handleRemove(item.id) : undefined}
+                      />
+                    </>
+                  )}
                 </React.Fragment>
               ))}
               <div className="pt-4 pb-2 text-center">
@@ -493,12 +622,26 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
               </div>
             </div>
           </div>
+
+          {/* Undo snackbar */}
+          {lastRemoved && (
+            <div className="fixed bottom-36 left-1/2 z-50 -translate-x-1/2 pointer-events-auto">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-zinc-900/95 backdrop-blur-xl px-5 py-3 shadow-2xl">
+                <span className="text-sm text-white/80">Removed</span>
+                <span className="text-xs text-white/40 truncate max-w-[120px]">{lastRemoved.item.options[0]?.title ?? 'item'}</span>
+                <button onClick={handleUndo}
+                  className="rounded-xl bg-teal-500 hover:bg-teal-400 px-3 py-1.5 text-xs font-semibold text-black transition-all">
+                  Undo
+                </button>
+              </div>
+            </div>
+          )}
           {/* Bottom bar */}
           <div className="fixed bottom-20 left-0 right-0 z-40 px-4 pb-2 pointer-events-none">
             <div className="mx-auto max-w-lg pointer-events-auto">
               <div className="rounded-3xl border border-white/15 bg-[#07161d]/95 backdrop-blur-2xl px-4 py-3 shadow-2xl flex items-center justify-between gap-3">
                 <button onClick={handleEdit}
-                  className="flex items-center gap-1.5 rounded-2xl border border-white/20 px-4 py-2.5 text-xs font-bold text-white/70 hover:bg-white/5">
+                  className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 hover:bg-white/20 px-4 py-2.5 text-xs font-semibold text-white">
                   <ChevronLeft size={13} />Edit Plan
                 </button>
                 <div className="text-center flex-1">
@@ -508,7 +651,7 @@ export const AIPlannerView: React.FC<AIPlannerViewProps> = ({ onBack }) => {
                   <p className="text-[9px] text-white/35">total estimated</p>
                 </div>
                 <button onClick={handleBookAll}
-                  className="flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-teal-500/30">
+                  className="flex items-center gap-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 px-4 py-2.5 text-xs font-semibold text-black shadow-lg shadow-teal-500/30">
                   Book All<ArrowRight size={13} />
                 </button>
               </div>

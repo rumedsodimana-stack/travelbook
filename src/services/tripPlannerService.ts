@@ -266,6 +266,27 @@ function buildMockPlan(input: TripPlanInput): TripPlan {
     cursor = addMinutes(endAt, travelTimeTo);
   };
 
+  // Insert a standalone transport item (it IS the travel — travelTimeTo: 0)
+  const pushTransport = (toTitle: string, durationMins: number): void => {
+    pushItem('transport', [
+      makeOption(
+        'TravelBook Ride', `Private car to ${toTitle} via TravelBook Rides`,
+        Math.round(durationMins * 0.9 + 5), cur,
+        { tags: ['Recommended', 'Private', 'Door-to-door'], duration: durationMins, rating: 4.7, reviewCount: 1240, provider: 'TravelBook Rides' }
+      ),
+      makeOption(
+        'Taxi', `Metered taxi to ${toTitle}`,
+        Math.round(durationMins * 0.7), cur,
+        { tags: ['Standard'], duration: durationMins + 5, rating: 4.2, reviewCount: 680, provider: 'Local Taxi' }
+      ),
+      makeOption(
+        'Public Transit', `Metro / bus to ${toTitle}`,
+        Math.round(durationMins * 0.2 + 2) * Math.max(1, Math.round(input.travellers / 2)), cur,
+        { tags: ['Budget', 'Eco-friendly'], duration: durationMins + 10, rating: 4.0, reviewCount: 890 }
+      ),
+    ], durationMins, '', 0, false);
+  };
+
   // ── VISA ──────────────────────────────────────────────────────────────────
   pushItem('visa', [
     makeOption('Visa on Arrival', dest.visaNote, dest.visaFee, cur, { tags: ['Required'], duration: 60, rating: 4.2, reviewCount: 1240 }),
@@ -280,7 +301,10 @@ function buildMockPlan(input: TripPlanInput): TripPlan {
     f.price * input.travellers,
     cur,
     { tags: [i === 0 ? (isLuxury ? 'Business class' : 'Economy Flex') : 'Economy', 'Direct'], duration: f.duration, rating: 4.2 + i * 0.1, reviewCount: 800 + i * 150, provider: f.airline }
-  )), flightOrder[0].duration, 'Book early for best prices. Check baggage allowance.', 30, true);
+  )), flightOrder[0].duration, 'Book early for best prices. Check baggage allowance.', 0, true);
+
+  // ── AIRPORT → HOTEL TRANSFER ──────────────────────────────────────────────
+  pushTransport('Hotel Check-in', 40);
 
   // ── FIRST NIGHT ACCOMMODATION ─────────────────────────────────────────────
   cursor = `${input.startDate}T${String(14 + Math.floor(flightOrder[0].duration / 60) % 8).padStart(2, '0')}:00:00.000Z`;
@@ -305,33 +329,37 @@ function buildMockPlan(input: TripPlanInput): TripPlan {
       makeOption(`Breakfast at ${bRest.name}`, bRest.cuisine, bRest.price * input.travellers, cur, { rating: bRest.rating, reviewCount: 540, duration: 60, tags: ['Breakfast'] }),
       makeOption('Hotel breakfast', 'In-house buffet', 18 * input.travellers, cur, { rating: 4.1, reviewCount: 320, duration: 60, tags: ['Convenient', 'Buffet'] }),
       makeOption('Grab & go', 'Local bakery / coffee shop', 8 * input.travellers, cur, { rating: 4.0, reviewCount: 190, duration: 30, tags: ['Quick', 'Local'] }),
-    ], 60, 'Start your day well-rested and fueled.', 20);
+    ], 60, 'Start your day well-rested and fueled.', 0);
 
     // Morning activity
     const actA = acts[d % acts.length];
+    pushTransport(actA.name, 25);
     pushItem(actA.category, [
       makeOption(actA.name, actA.desc, actA.price * input.travellers, cur, { rating: 4.6, reviewCount: 1800, duration: actA.duration, tags: ['Top-rated', 'Must-do'] }),
       makeOption(`${actA.name} – Private Tour`, `Private guided experience`, actA.price * 1.8 * input.travellers, cur, { rating: 4.9, reviewCount: 340, duration: actA.duration - 30, tags: ['Private', 'Skip-the-line'] }),
       makeOption('Free exploration', 'Self-guided at your own pace', 0, cur, { rating: 4.3, reviewCount: 220, duration: actA.duration, tags: ['Free', 'Flexible'] }),
-    ], actA.duration, `Tip: Book in advance. Best visited ${d % 2 === 0 ? 'in the morning' : 'in the afternoon'} to avoid crowds.`, 20);
+    ], actA.duration, `Tip: Book in advance. Best visited ${d % 2 === 0 ? 'in the morning' : 'in the afternoon'} to avoid crowds.`, 0);
 
     // Lunch
     const lRest = rests[(d + 1) % rests.length];
+    pushTransport('Lunch', 15);
     pushItem('dining', [
       makeOption(`Lunch at ${lRest.name}`, lRest.cuisine, lRest.price * input.travellers, cur, { rating: lRest.rating, reviewCount: 780, duration: 90, tags: ['Local favorite'] }),
       makeOption('Street food market', 'Authentic local street food stalls', 10 * input.travellers, cur, { rating: 4.5, reviewCount: 1100, duration: 60, tags: ['Authentic', 'Budget'] }),
       makeOption('Café lunch', 'Casual café with Wi-Fi', 20 * input.travellers, cur, { rating: 4.2, reviewCount: 430, duration: 75, tags: ['Relaxed', 'Wi-Fi'] }),
-    ], 90, '', 15);
+    ], 90, '', 0);
 
     // Afternoon activity
     const actB = acts[(d + 1) % acts.length];
+    pushTransport(actB.name, 20);
     pushItem(actB.category, [
       makeOption(actB.name, actB.desc, actB.price * input.travellers, cur, { rating: 4.5, reviewCount: 2100, duration: actB.duration, tags: ['Highly-rated'] }),
       makeOption(`${actB.name} – Group Tour`, 'Join a small group tour', actB.price * 0.8 * input.travellers, cur, { rating: 4.3, reviewCount: 650, duration: actB.duration, tags: ['Group', 'Social'] }),
       makeOption('Alternative: Spa & wellness', 'Traditional local spa treatment', 60 * input.travellers, cur, { rating: 4.7, reviewCount: 890, duration: 120, tags: ['Relaxing', 'Wellness'] }),
-    ], actB.duration, '', 30);
+    ], actB.duration, '', 0);
 
-    // Dinner
+    // Evening return + Dinner
+    pushTransport('Hotel / Dinner', 25);
     const dRest = rests[(d + 2) % rests.length];
     pushItem('dining', [
       makeOption(`Dinner at ${dRest.name}`, dRest.cuisine, dRest.price * 1.5 * input.travellers, cur, { rating: dRest.rating, reviewCount: 920, duration: 120, tags: ['Dinner', 'Recommended'] }),
@@ -340,9 +368,13 @@ function buildMockPlan(input: TripPlanInput): TripPlan {
     ], 120, d % 3 === 0 ? 'Reservations recommended 24–48 hours in advance.' : '', 0);
   }
 
-  // ── RETURN FLIGHT ─────────────────────────────────────────────────────────
-  const returnBase = `${input.endDate}T10:00:00.000Z`;
+  // ── HOTEL → AIRPORT TRANSFER ─────────────────────────────────────────────
+  const returnBase = `${input.endDate}T07:00:00.000Z`;
   cursor = returnBase;
+  pushTransport('Airport (Departure)', 45);
+
+  // ── RETURN FLIGHT ─────────────────────────────────────────────────────────
+  cursor = `${input.endDate}T10:00:00.000Z`;
   const retFlight = flightOrder[0];
   pushItem('flight', [
     makeOption(`${retFlight.airline} ${retFlight.code.replace(/\d+/, (n) => String(Number(n) + 1))}`,

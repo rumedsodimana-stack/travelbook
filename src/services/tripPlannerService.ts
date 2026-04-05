@@ -350,7 +350,7 @@ function buildMockPlan(input: TripPlanInput): TripPlan {
       retFlight.price * input.travellers, cur,
       { tags: ['Return', isLuxury ? 'Business class' : 'Economy Flex'], duration: retFlight.duration, rating: 4.3, reviewCount: 760, provider: retFlight.airline }),
     makeOption(`${flightOrder[1]?.airline ?? dest.flights[1].airline} (Return)`,
-      `${input.destination} → ${input.originCity}`, flightOrder[1]?.price * input.travellers ?? retFlight.price * 0.9 * input.travellers, cur,
+      `${input.destination} → ${input.originCity}`, (flightOrder[1]?.price ?? retFlight.price * 0.9) * input.travellers, cur,
       { tags: ['Return', 'Economy'], duration: (flightOrder[1]?.duration ?? retFlight.duration) + 30, rating: 4.1, reviewCount: 540 }),
   ], retFlight.duration, 'Arrive at airport 3 hours before departure.', 0, true);
 

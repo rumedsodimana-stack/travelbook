@@ -25,8 +25,57 @@ export const getSearchSuggestions = async (input: string) => {
   } catch (error) { console.error("Suggestions Error:", error); return []; }
 };
 
+// ---------------------------------------------------------------------------
+// Mock itinerary — used when NEXT_PUBLIC_GEMINI_API_KEY is not configured
+// ---------------------------------------------------------------------------
+function buildMockItinerary(
+  destination: string,
+  budget: string,
+  duration: string,
+  departureCity: string,
+) {
+  const numDays = duration.toLowerCase().includes('week') ? 7
+    : duration.includes('5') ? 5
+    : duration.includes('10') ? 10
+    : 3;
+  const mult = budget.toLowerCase().includes('luxury') ? 2
+    : budget.toLowerCase().includes('budget') ? 0.6
+    : 1;
+  const base = Math.round(900 * numDays * mult);
+  const days = Array.from({ length: numDays }, (_, i) => ({
+    day: i + 1,
+    title: i === 0 ? `Arrival & First Impressions of ${destination}`
+      : i === numDays - 1 ? `Last Day — ${destination} Farewell`
+      : `Day ${i + 1} — Exploring ${destination}`,
+    items: [
+      { time: '08:30', activity: 'Breakfast at local café', description: `Kick off day ${i + 1} with a local breakfast near your hotel in ${destination}.`, category: 'food', estimatedCost: Math.round(18 * mult) },
+      { time: '10:00', activity: 'Morning sightseeing', description: `Visit iconic spots and hidden gems of ${destination}.`, category: 'activity', estimatedCost: Math.round(35 * mult) },
+      { time: '13:00', activity: 'Lunch', description: 'Savoury local cuisine at a well-rated restaurant.', category: 'food', estimatedCost: Math.round(28 * mult) },
+      { time: '15:00', activity: 'Afternoon excursion', description: `Cultural or nature tour around ${destination}.`, category: 'activity', estimatedCost: Math.round(45 * mult) },
+      { time: '19:30', activity: 'Dinner', description: 'Evening meal with local flavours.', category: 'food', estimatedCost: Math.round(50 * mult) },
+    ],
+  }));
+  return {
+    totalEstimatedBudget: base,
+    currency: 'USD',
+    flights: { airline: 'Demo Airlines', estimatedPrice: Math.round(420 * mult), duration: '9h 15m', type: 'Return' },
+    budgetBreakdown: {
+      accommodation: Math.round(base * 0.35),
+      food: Math.round(base * 0.25),
+      activities: Math.round(base * 0.20),
+      transport: Math.round(base * 0.20),
+    },
+    days,
+    sources: [],
+  };
+}
+
 export const generateItinerary = async (destination: string, interests: string, budget: string, duration: string, departureCity: string = 'anywhere') => {
-  if (!API_KEY) return null;
+  if (!API_KEY) {
+    // No API key — fall back to demo data so the planner UI stays fully functional
+    await new Promise((r) => setTimeout(r, 1800));
+    return buildMockItinerary(destination, budget, duration, departureCity);
+  }
   try {
     const { GoogleGenAI, Type } = await import("@google/genai");
     const ai = new GoogleGenAI({ apiKey: API_KEY });

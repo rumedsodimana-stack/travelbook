@@ -23,6 +23,7 @@ interface TravelPlannerViewProps {
   onBookClick?: (business: User) => void;
   onShareAsPost?: (content: string, isBuddyRequest: boolean) => void;
   onTripSaved?: () => void;
+  onNavigateToBookings?: () => void;
 }
 
 interface TravelData {
@@ -250,7 +251,7 @@ const BudgetBar: React.FC<BudgetBarProps> = ({ breakdown, total, travellers }) =
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, onBookClick, onShareAsPost, onTripSaved }) => {
+export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, onBookClick, onShareAsPost, onTripSaved, onNavigateToBookings }) => {
   const { addTrip } = useTrips();
   const [destination, setDestination] = useState('');
   const [departureCity, setDepartureCity] = useState('');
@@ -703,7 +704,7 @@ export const TravelPlannerView: React.FC<TravelPlannerViewProps> = ({ onBack, on
                     <p className="text-zinc-400 text-xs mt-0.5">Your full itinerary is ready in My Trips — everything is pre-arranged.</p>
                   </div>
                 </div>
-                <button onClick={() => onTripSaved?.()}
+                <button onClick={() => { onTripSaved?.(); onNavigateToBookings?.(); }}
                   className="flex-shrink-0 px-8 py-4 bg-teal-500 hover:bg-teal-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-lg shadow-teal-500/20 hover:scale-[1.02] transition-all">
                   View in Trips <ArrowRight size={14} />
                 </button>

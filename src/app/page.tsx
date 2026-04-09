@@ -716,6 +716,7 @@ const AppContent: React.FC = () => {
             onBookClick={openBooking}
             onShareAsPost={handlePlannerShare}
             onTripSaved={() => openRoute(AppRoute.BOOKINGS)}
+            onNavigateToBookings={() => openRoute(AppRoute.BOOKINGS)}
           />
         )}
 

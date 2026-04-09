@@ -31,25 +31,23 @@ export function useTrips() {
   const [trips, setTrips] = useState<TripItinerary[]>(() => loadTrips());
 
   const addTrip = useCallback((trip: TripItinerary) => {
-    setTrips((prev) => {
-      const updated = [trip, ...prev];
-      persistTrips(updated);
-      return updated;
-    });
+    const updated = [trip, ...loadTrips()];
+    persistTrips(updated);
+    setTrips(updated);
   }, []);
 
   const updateItemStatus = useCallback(
     (tripId: string, itemId: string, status: TripItem['status']) => {
       setTrips((prev) => {
-        const updated = prev.map((trip) =>
-          trip.id === tripId
+        const updated = prev.map((t) =>
+          t.id === tripId
             ? {
-                ...trip,
-                items: trip.items.map((item) =>
+                ...t,
+                items: t.items.map((item) =>
                   item.id === itemId ? { ...item, status } : item,
                 ),
               }
-            : trip,
+            : t,
         );
         persistTrips(updated);
         return updated;

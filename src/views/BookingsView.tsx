@@ -599,7 +599,7 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ bookings }) => {
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
                   <Sparkles size={12} className="text-teal-400" />
-                  <span className="text-teal-400 text-[9px] font-black uppercase tracking-widest">Plan a trip → Search → AI Trip Planner</span>
+                  <span className="text-teal-400 text-[9px] font-black uppercase tracking-widest">Plan a trip → Search → Trip Planner</span>
                 </div>
               </GlassCard>
             ) : (

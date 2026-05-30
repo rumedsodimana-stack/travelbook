@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,6 +37,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <head>
+        <Script id="travelpayouts-drive" strategy="beforeInteractive">
+          {`(function () {
+    var script = document.createElement("script");
+    script.async = 1;
+    script.src = "https://emrldtp.cc/NTE4NDQ2.js?t=518446";
+    document.head.appendChild(script);
+  })();`}
+        </Script>
+      </head>
       <body className="min-h-full bg-[#07161d] text-white font-sans">
         {children}
       </body>

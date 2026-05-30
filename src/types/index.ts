@@ -168,6 +168,69 @@ export interface LeaderboardEntry {
   isSelf?: boolean;
 }
 
+export interface PostComment {
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  text: string;
+  timestamp: string;
+  isVerified?: boolean;
+  helpfulCount?: number;
+  parentId?: string | null;
+  replies?: PostComment[];
+}
+
+export interface AppBootstrap {
+  posts: Post[];
+  bookings: Booking[];
+  chats: Chat[];
+  notifications: Notification[];
+  stories: User[];
+  suggestedUsers: User[];
+  trendingDestinations: string[];
+}
+
+export interface CreatePostPayload {
+  userId: string;
+  content: string;
+  location?: string;
+  postType?: Post['postType'];
+  mediaList?: PostMedia[];
+  audience?: 'public' | 'friends' | 'private';
+  tags?: string[];
+  isLive?: boolean;
+}
+
+export interface CreateCommentPayload {
+  userId: string;
+  text: string;
+  parentId?: string | null;
+}
+
+export interface UpdateProfilePayload {
+  name?: string;
+  username?: string;
+  avatar?: string;
+  accountType?: AccountType;
+  bio?: string;
+  category?: string;
+  companyName?: string;
+  providerType?: ProviderType;
+  supplierType?: SupplierType;
+  locationBase?: string;
+  website?: string;
+  contactEmail?: string;
+  integrationPreference?: IntegrationPreference;
+  membershipTier?: MembershipTier;
+  onboardingGoals?: string[];
+  onboardingCompleted?: boolean;
+  providerInvitationId?: string;
+  providerInvitationToken?: string;
+  backendProviderId?: string;
+}
+
 // ─── AI Trip Planner types ────────────────────────────────────────────────────
 
 export type PlanItemCategory =

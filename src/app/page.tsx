@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import { Bell, MessageCircle, Mountain, Settings as SettingsIcon } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
@@ -21,196 +22,28 @@ import { SearchView } from '@/views/SearchView';
 import { SettingsView } from '@/views/SettingsView';
 import { TravelPlannerView } from '@/views/TravelPlannerView';
 import { AIPlannerView } from '@/views/AIPlannerView';
-import { clearTravelBookSession, getPersistedTravelBookSession, updateStoredTravelBookUser } from '@/services/accountService';
-import { generateMockUser, getMassiveFeed } from '@/services/dataFactory';
+import {
+  clearTravelBookSession,
+  getPersistedTravelBookSession,
+  updateStoredTravelBookUser,
+} from '@/services/accountService';
+import {
+  fetchAppBootstrap,
+  fetchFeedPage,
+  openChatThread,
+  updateProfileApi,
+} from '@/services/appApi';
 import { hydrateTravelBookUser, resolveIdentityKind } from '@/services/identityService';
-import { clearTravelBookInviteContext, getTravelBookInviteContext, TravelBookInviteContext } from '@/services/providerInviteService';
-import { syncTravelBookProviderAccount, validateTravelBookProviderInvitation } from '@/services/providerOnboardingApiService';
+import {
+  clearTravelBookInviteContext,
+  getTravelBookInviteContext,
+  TravelBookInviteContext,
+} from '@/services/providerInviteService';
+import {
+  syncTravelBookProviderAccount,
+  validateTravelBookProviderInvitation,
+} from '@/services/providerOnboardingApiService';
 import { AppRoute, Booking, Chat, Post, User } from '@/types';
-
-const liveAuthor: User = hydrateTravelBookUser({
-  ...generateMockUser(901),
-  id: 'live-host-1',
-  name: 'SkyLink Live',
-  username: '@skylink_live',
-  avatar: 'https://picsum.photos/seed/skylink-live/200',
-  accountType: 'provider',
-  providerType: 'flight',
-  membershipTier: 'gold',
-  category: 'Airline',
-  isBusiness: true,
-  bio: 'Live route updates from verified flight corridors and active destination windows.',
-});
-
-const spotlightHost: User = hydrateTravelBookUser({
-  ...generateMockUser(902),
-  id: 'host-kyoto-plaza',
-  name: 'Grand Plaza Kyoto',
-  username: '@grand_plaza_kyoto',
-  avatar: 'https://picsum.photos/seed/grand-plaza-kyoto/200',
-  accountType: 'provider',
-  providerType: 'hotel',
-  membershipTier: 'premium',
-  category: 'Hotel',
-  isBusiness: true,
-  bio: 'Verified stay inventory with concierge support and seamless city-center check-in.',
-});
-
-const INITIAL_POSTS: Post[] = [
-  {
-    id: 'post-live-sky',
-    userId: liveAuthor.id,
-    author: liveAuthor,
-    content: 'Live boarding window is open and tonight\'s long-haul route looks perfectly clear. Streaming from the departure gate now.',
-    imageUrl: 'https://picsum.photos/seed/live-skylink/1200/1600',
-    likes: 18420,
-    comments: 612,
-    timestamp: 'Live now',
-    location: 'Dubai, UAE',
-    postType: 'story',
-    isLive: true,
-    liveViewerCount: 1284,
-  },
-  {
-    id: 'post-grand-plaza',
-    userId: spotlightHost.id,
-    author: spotlightHost,
-    content: 'Our spring city package is open: flexible nights, guided district walks, and creator-ready rooftop views all week.',
-    imageUrl: 'https://picsum.photos/seed/grand-plaza-post/1200/900',
-    likes: 5210,
-    comments: 184,
-    timestamp: '1h ago',
-    location: 'Kyoto, Japan',
-    postType: 'advertisement',
-    isPromoted: true,
-  },
-  ...getMassiveFeed(0, 8),
-];
-
-const INITIAL_BOOKINGS: Booking[] = [
-  {
-    id: 'bk-flight-1',
-    type: 'flight',
-    title: 'SkyLink AX204',
-    subtitle: 'New York to Dubai',
-    date: '2026-04-12',
-    status: 'confirmed',
-    price: '$920',
-    details: 'Economy Flex • 12h 15m',
-    category: 'Airline',
-    txHash: '0x5a7f912be1',
-    gdsNode: 'Sabre',
-    lifecycleStage: 'active',
-  },
-  {
-    id: 'bk-hotel-1',
-    type: 'hotel',
-    title: 'Grand Plaza Kyoto',
-    subtitle: '3 nights • Deluxe Room',
-    date: '2026-04-13',
-    status: 'confirmed',
-    price: '$640',
-    details: 'Breakfast • Wi-Fi • Late Check-in',
-    category: 'Hotel',
-    txHash: '0x8bd412af20',
-    gdsNode: 'Travelport',
-    lifecycleStage: 'active',
-  },
-  {
-    id: 'bk-event-1',
-    type: 'event',
-    title: 'Festival Hub Night Pass',
-    subtitle: '2 Verified Tickets',
-    date: '2026-04-15',
-    status: 'confirmed',
-    price: '$190',
-    details: 'Priority entry • 8 PM',
-    category: 'Event',
-    txHash: '0xa912c45e77',
-    gdsNode: 'Amadeus',
-    lifecycleStage: 'active',
-  },
-];
-
-const INITIAL_CHATS: Chat[] = [
-  {
-    id: 'chat-u1',
-    participant: {
-      ...generateMockUser(45),
-      id: 'u1',
-      name: 'Maya Rivers',
-      username: '@maya_routes',
-      avatar: 'https://picsum.photos/seed/maya-rivers/200',
-      category: 'Luxury Traveler',
-      bio: 'Sharing long-haul city routes, hotel finds, and easy booking tips.',
-    },
-    lastMessage: 'Did you save that Kyoto stay from the discovery feed?',
-    timestamp: '10:22 AM',
-    unreadCount: 2,
-  },
-  {
-    id: 'chat-u2',
-    participant: {
-      ...generateMockUser(46),
-      id: 'u2',
-      name: 'Blue Horizon Rail',
-      username: '@blue_horizon',
-      avatar: 'https://picsum.photos/seed/blue-horizon/200',
-      category: 'Rail Service',
-      isBusiness: true,
-      bio: 'Scenic rail inventory and cross-border route support.',
-    },
-    lastMessage: 'Your rail booking window is ready to confirm.',
-    timestamp: 'Yesterday',
-    unreadCount: 0,
-  },
-  {
-    id: 'chat-u3',
-    participant: {
-      ...generateMockUser(47),
-      id: 'u3',
-      name: 'Aria Nomad',
-      username: '@aria_nomad',
-      avatar: 'https://picsum.photos/seed/aria-solo/200',
-      category: 'Solo Traveler',
-      bio: 'Slow travel, budget stays, off-the-beaten-path finds.',
-    },
-    lastMessage: "Adding it all to my plan 🙌",
-    timestamp: 'Mon',
-    unreadCount: 1,
-  },
-  {
-    id: 'chat-u4',
-    participant: {
-      ...generateMockUser(48),
-      id: 'u4',
-      name: 'Santorini Crest Hotel',
-      username: '@santorinicense',
-      avatar: 'https://picsum.photos/seed/santorini-h/200',
-      category: 'Hotel',
-      isBusiness: true,
-      bio: 'Clifftop suites and cave rooms with caldera views.',
-    },
-    lastMessage: 'Our concierge will greet you at arrival.',
-    timestamp: 'Tue',
-    unreadCount: 0,
-  },
-  {
-    id: 'chat-u5',
-    participant: {
-      ...generateMockUser(49),
-      id: 'u5',
-      name: 'Marcus Chen',
-      username: '@marcus_adventures',
-      avatar: 'https://picsum.photos/seed/marcus/200',
-      category: 'Adventure Traveler',
-      bio: 'Multi-day treks, gear reviews, and route planning.',
-    },
-    lastMessage: "This is going to be epic 🏔️🔥",
-    timestamp: 'Wed',
-    unreadCount: 3,
-  },
-];
 
 const ROUTE_META: Partial<Record<AppRoute, { title: string; subtitle: string }>> = {
   [AppRoute.HOME]: {
@@ -279,9 +112,17 @@ const AppContent: React.FC = () => {
   const [isInviteLoading, setIsInviteLoading] = useState(Boolean(queryInvitation));
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.HOME);
   const [previousRoute, setPreviousRoute] = useState<AppRoute>(AppRoute.HOME);
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
-  const [bookings, setBookings] = useState<Booking[]>(INITIAL_BOOKINGS);
-  const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [stories, setStories] = useState<User[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
+  const [trendingDestinations, setTrendingDestinations] = useState<string[]>([]);
+  const [isAppDataLoading, setIsAppDataLoading] = useState(false);
+  const [appDataError, setAppDataError] = useState<string | null>(null);
+  const [feedPage, setFeedPage] = useState(1);
+  const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
+  const [appDataVersion, setAppDataVersion] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [livePost, setLivePost] = useState<Post | null>(null);
@@ -347,11 +188,68 @@ const AppContent: React.FC = () => {
     setPendingInvitation(null);
   }, [currentUser, pendingInvitation]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAppData = async () => {
+      if (!currentUser?.onboardingCompleted) {
+        return;
+      }
+
+      setIsAppDataLoading(true);
+      setAppDataError(null);
+
+      try {
+        const data = await fetchAppBootstrap(currentUser.id);
+
+        if (cancelled) {
+          return;
+        }
+
+        setPosts(data.posts);
+        setBookings(data.bookings);
+        setChats(data.chats);
+        setStories(data.stories);
+        setSuggestedUsers(data.suggestedUsers);
+        setTrendingDestinations(data.trendingDestinations);
+        setFeedPage(1);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setAppDataError(
+          error instanceof Error
+            ? error.message
+            : 'TravelBook could not load live app data.',
+        );
+        setPosts([]);
+        setBookings([]);
+        setChats([]);
+        setStories([]);
+        setSuggestedUsers([]);
+        setTrendingDestinations([]);
+      } finally {
+        if (!cancelled) {
+          setIsAppDataLoading(false);
+        }
+      }
+    };
+
+    void loadAppData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?.onboardingCompleted, appDataVersion]);
+
   const clearPendingInvitation = () => {
     clearTravelBookInviteContext();
     setPendingInvitation(null);
     setIsInviteLoading(false);
   };
+
+  const reloadAppData = () => setAppDataVersion((currentVersion) => currentVersion + 1);
 
   const shouldSyncHotelProvider = (user: User) =>
     user.accountType === 'provider' &&
@@ -414,18 +312,61 @@ const AppContent: React.FC = () => {
       isAdmin: user.id === 'demo-user-123',
     };
 
-    const storedUser = updateStoredTravelBookUser(hydratedUser);
+    const completeOnboarding = async () => {
+      let nextUser = hydratedUser;
 
-    clearPendingInvitation();
-    setCurrentUser(storedUser);
-    setCurrentRoute(storedUser.accountType === 'traveler' ? AppRoute.HOME : AppRoute.PROFILE);
-    showToast(`${storedUser.name} is ready to go.`, 'success');
+      try {
+        const remoteUser = await updateProfileApi(hydratedUser.id, {
+          name: hydratedUser.name,
+          username: hydratedUser.username,
+          avatar: hydratedUser.avatar,
+          accountType: hydratedUser.accountType,
+          bio: hydratedUser.bio,
+          category: hydratedUser.category,
+          companyName: hydratedUser.companyName,
+          providerType: hydratedUser.providerType,
+          supplierType: hydratedUser.supplierType,
+          locationBase: hydratedUser.locationBase,
+          website: hydratedUser.website,
+          contactEmail: hydratedUser.contactEmail,
+          integrationPreference: hydratedUser.integrationPreference,
+          membershipTier: hydratedUser.membershipTier,
+          onboardingGoals: hydratedUser.onboardingGoals,
+          onboardingCompleted: hydratedUser.onboardingCompleted,
+          providerInvitationId: hydratedUser.providerInvitationId,
+          providerInvitationToken: hydratedUser.providerInvitationToken,
+          backendProviderId: hydratedUser.backendProviderId,
+        });
 
-    void syncHotelProvider(storedUser).then((syncedUser) => {
-      if (syncedUser.id === storedUser.id) {
-        setCurrentUser((current) => (current?.id === syncedUser.id ? syncedUser : current));
+        nextUser = {
+          ...hydratedUser,
+          ...remoteUser,
+          isAdmin: hydratedUser.isAdmin,
+        };
+      } catch (error) {
+        showToast(
+          error instanceof Error
+            ? `${error.message} Local changes were kept.`
+            : 'TravelBook could not save that setup yet. Local changes were kept.',
+          'info',
+        );
       }
-    });
+
+      const storedUser = updateStoredTravelBookUser(nextUser);
+
+      clearPendingInvitation();
+      setCurrentUser(storedUser);
+      setCurrentRoute(storedUser.accountType === 'traveler' ? AppRoute.HOME : AppRoute.PROFILE);
+      showToast(`${storedUser.name} is ready to go.`, 'success');
+
+      void syncHotelProvider(storedUser).then((syncedUser) => {
+        if (syncedUser.id === storedUser.id) {
+          setCurrentUser((current) => (current?.id === syncedUser.id ? syncedUser : current));
+        }
+      });
+    };
+
+    void completeOnboarding();
   };
 
   const handleLogout = () => {
@@ -439,6 +380,13 @@ const AppContent: React.FC = () => {
     setBookingBusiness(null);
     setComposeContent('');
     setComposeType('story');
+    setPosts([]);
+    setBookings([]);
+    setChats([]);
+    setStories([]);
+    setSuggestedUsers([]);
+    setTrendingDestinations([]);
+    setAppDataError(null);
     showToast('Logged out of Travel Book.', 'info');
   };
 
@@ -500,56 +448,75 @@ const AppContent: React.FC = () => {
     setCurrentRoute(AppRoute.POST);
   };
 
-  const startChatWithUser = (user: User) => {
-    const chatId = `chat-${user.id}`;
-    setChats((currentChats) => {
-      if (currentChats.some((chat) => chat.id === chatId)) {
-        return currentChats;
-      }
+  const startChatWithUser = async (user: User) => {
+    if (!currentUser) {
+      return;
+    }
 
-      return [
-        {
-          id: chatId,
-          participant: user,
-          lastMessage: 'Say hello and start planning.',
-          timestamp: 'Now',
-          unreadCount: 0,
-        },
-        ...currentChats,
-      ];
-    });
-
-    setCurrentRoute(AppRoute.CHATS);
-    showToast(`Chat opened for ${user.name}.`, 'info');
+    try {
+      const chat = await openChatThread(currentUser.id, user.id);
+      setChats((currentChats) => [
+        chat,
+        ...currentChats.filter((existingChat) => existingChat.id !== chat.id),
+      ]);
+      setCurrentRoute(AppRoute.CHATS);
+      showToast(`Chat opened for ${user.name}.`, 'info');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'TravelBook could not open that chat yet.',
+        'info',
+      );
+    }
   };
 
-  const handleProfileUpdate = (updatedUser: User) => {
-    const storedUser = updateStoredTravelBookUser(updatedUser);
-
-    setCurrentUser((currentCurrentUser) =>
-      currentCurrentUser?.id === storedUser.id ? storedUser : currentCurrentUser,
-    );
-    setSelectedUser((currentSelected) => (currentSelected?.id === storedUser.id ? storedUser : currentSelected));
-    setPosts((currentPosts) =>
-      currentPosts.map((post) => (post.author.id === storedUser.id ? { ...post, author: storedUser } : post)),
-    );
-    showToast('Profile updated.', 'success');
-
-    void syncHotelProvider(storedUser).then((syncedUser) => {
-      if (syncedUser.id !== storedUser.id) {
-        return;
-      }
+  const handleProfileUpdate = async (updatedUser: User) => {
+    try {
+      const remoteUser = await updateProfileApi(updatedUser.id, {
+        name: updatedUser.name,
+        bio: updatedUser.bio,
+        category: updatedUser.category,
+        membershipTier: updatedUser.membershipTier,
+      });
+      const storedUser = updateStoredTravelBookUser(remoteUser);
 
       setCurrentUser((currentCurrentUser) =>
-        currentCurrentUser?.id === syncedUser.id ? syncedUser : currentCurrentUser,
+        currentCurrentUser?.id === storedUser.id ? storedUser : currentCurrentUser,
       );
       setSelectedUser((currentSelected) =>
-        currentSelected?.id === syncedUser.id ? syncedUser : currentSelected,
+        currentSelected?.id === storedUser.id ? storedUser : currentSelected,
       );
       setPosts((currentPosts) =>
-        currentPosts.map((post) => (post.author.id === syncedUser.id ? { ...post, author: syncedUser } : post)),
+        currentPosts.map((post) => (post.author.id === storedUser.id ? { ...post, author: storedUser } : post)),
       );
-    });
+      setStories((currentStories) =>
+        currentStories.map((storyUser) => (storyUser.id === storedUser.id ? storedUser : storyUser)),
+      );
+      setSuggestedUsers((currentSuggestions) =>
+        currentSuggestions.map((suggestedUser) => (suggestedUser.id === storedUser.id ? storedUser : suggestedUser)),
+      );
+      showToast('Profile updated.', 'success');
+
+      void syncHotelProvider(storedUser).then((syncedUser) => {
+        if (syncedUser.id !== storedUser.id) {
+          return;
+        }
+
+        setCurrentUser((currentCurrentUser) =>
+          currentCurrentUser?.id === syncedUser.id ? syncedUser : currentCurrentUser,
+        );
+        setSelectedUser((currentSelected) =>
+          currentSelected?.id === syncedUser.id ? syncedUser : currentSelected,
+        );
+        setPosts((currentPosts) =>
+          currentPosts.map((post) => (post.author.id === syncedUser.id ? { ...post, author: syncedUser } : post)),
+        );
+      });
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Profile update failed.',
+        'info',
+      );
+    }
   };
 
   const handlePlannerShare = (content: string, isBuddyRequest: boolean) => {
@@ -562,6 +529,186 @@ const AppContent: React.FC = () => {
     setBookingBusiness(null);
     setCurrentRoute(AppRoute.BOOKINGS);
     showToast(`${booking.title} added to your bookings.`, 'success');
+  };
+
+  const handleLoadMorePosts = async () => {
+    setIsFeedLoadingMore(true);
+
+    try {
+      const nextPosts = await fetchFeedPage(feedPage, 10);
+      setPosts((currentPosts) => [
+        ...currentPosts,
+        ...nextPosts.filter((post) => !currentPosts.some((existingPost) => existingPost.id === post.id)),
+      ]);
+      setFeedPage((currentPage) => currentPage + 1);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'TravelBook could not load more posts.',
+        'info',
+      );
+    } finally {
+      setIsFeedLoadingMore(false);
+    }
+  };
+
+  const renderRoute = () => {
+    if (isAppDataLoading) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center py-10">
+          <GlassCard className="w-full max-w-xl p-8 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">Travel Book Data</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">Loading your live app data</h2>
+            <p className="mt-3 text-sm leading-relaxed text-white/65">
+              Feed, bookings, chats, notifications, and suggested profiles are being loaded from the API.
+            </p>
+          </GlassCard>
+        </div>
+      );
+    }
+
+    if (appDataError) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center py-10">
+          <GlassCard className="w-full max-w-xl p-8 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">Travel Book Data</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">Live data needs attention</h2>
+            <p className="mt-3 text-sm leading-relaxed text-white/65">{appDataError}</p>
+            <button
+              onClick={reloadAppData}
+              className="mt-6 rounded-2xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950"
+            >
+              Retry loading
+            </button>
+          </GlassCard>
+        </div>
+      );
+    }
+
+    if (currentRoute === AppRoute.HOME) {
+      return (
+        <HomeView
+          posts={posts}
+          stories={stories}
+          suggestedUsers={suggestedUsers}
+          trendingDestinations={trendingDestinations}
+          isLoadingMore={isFeedLoadingMore}
+          onLoadMore={handleLoadMorePosts}
+          onPostClick={openPost}
+          onProfileClick={openProfile}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.SEARCH) {
+      return <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onBookClick={openBooking} />;
+    }
+
+    if (currentRoute === AppRoute.GAMES) {
+      return <BusinessHubView onProfileClick={openProfile} onBookClick={openBooking} />;
+    }
+
+    if (currentRoute === AppRoute.POST) {
+      return (
+        <CreatePostView
+          currentUser={currentUser!}
+          onComplete={() => {
+            setComposeContent('');
+            setComposeType('story');
+            setCurrentRoute(AppRoute.HOME);
+            showToast('Your post is live.', 'success');
+            reloadAppData();
+          }}
+          initialContent={composeContent}
+          initialType={composeType}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.BOOKINGS) {
+      return <BookingsView bookings={bookings} />;
+    }
+
+    if (currentRoute === AppRoute.PROFILE) {
+      return (
+        <ProfileView
+          user={currentUser!}
+          posts={posts}
+          onLogout={handleLogout}
+          onBusiness={() => setCurrentRoute(AppRoute.SETTINGS)}
+          onBookClick={openBooking}
+          onPostClick={openPost}
+          onSendMessage={startChatWithUser}
+          onUpdateProfile={handleProfileUpdate}
+          isOwnProfile
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.PLANNER) {
+      return (
+        <TravelPlannerView
+          onBack={() => setCurrentRoute(AppRoute.SEARCH)}
+          onBookClick={openBooking}
+          onShareAsPost={handlePlannerShare}
+          onTripSaved={() => openRoute(AppRoute.BOOKINGS)}
+          onNavigateToBookings={() => openRoute(AppRoute.BOOKINGS)}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.AI_PLANNER) {
+      return <AIPlannerView onBack={() => setCurrentRoute(previousRoute)} />;
+    }
+
+    if (currentRoute === AppRoute.POST_DETAIL && selectedPost) {
+      return (
+        <PostDetailView
+          post={selectedPost}
+          currentUser={currentUser!}
+          onBack={() => setCurrentRoute(previousRoute)}
+          onProfileClick={openProfile}
+          onBookClick={openBooking}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.USER_PROFILE && selectedUser) {
+      return (
+        <ProfileView
+          user={selectedUser}
+          posts={posts}
+          onLogout={handleLogout}
+          onBusiness={() => setCurrentRoute(AppRoute.SETTINGS)}
+          onBookClick={openBooking}
+          onPostClick={openPost}
+          onSendMessage={startChatWithUser}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.NOTIFICATIONS) {
+      return <NotificationsView currentUser={currentUser!} />;
+    }
+
+    if (currentRoute === AppRoute.CHATS) {
+      return <ChatsView chats={chats} setChats={setChats} currentUser={currentUser!} />;
+    }
+
+    if (currentRoute === AppRoute.SETTINGS) {
+      return (
+        <SettingsView
+          onLogout={handleLogout}
+          onAdminPortal={currentUser?.isAdmin ? () => setCurrentRoute(AppRoute.ADMIN) : undefined}
+          onProfileEdit={() => setCurrentRoute(AppRoute.PROFILE)}
+        />
+      );
+    }
+
+    if (currentRoute === AppRoute.ADMIN) {
+      return <AdminDashboardView onBack={() => setCurrentRoute(AppRoute.SETTINGS)} />;
+    }
+
+    return null;
   };
 
   if (isInviteLoading) {
@@ -669,98 +816,7 @@ const AppContent: React.FC = () => {
       </header>
 
       <main className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-28 px-4 sm:px-6 lg:px-8">
-        {currentRoute === AppRoute.HOME && (
-          <HomeView posts={posts} setPosts={setPosts} onPostClick={openPost} onProfileClick={openProfile} />
-        )}
-
-        {currentRoute === AppRoute.SEARCH && (
-          <SearchView onProfileClick={openProfile} onNavigateToPlanner={openPlanner} onBookClick={openBooking} />
-        )}
-
-        {currentRoute === AppRoute.GAMES && (
-          <BusinessHubView onProfileClick={openProfile} onBookClick={openBooking} />
-        )}
-
-        {currentRoute === AppRoute.POST && (
-          <CreatePostView
-            onComplete={() => {
-              setComposeContent('');
-              setComposeType('story');
-              setCurrentRoute(AppRoute.HOME);
-              showToast('Your post is live.', 'success');
-            }}
-            initialContent={composeContent}
-            initialType={composeType}
-          />
-        )}
-
-        {currentRoute === AppRoute.BOOKINGS && <BookingsView bookings={bookings} />}
-
-        {currentRoute === AppRoute.PROFILE && (
-          <ProfileView
-            user={currentUser}
-            posts={posts}
-            onLogout={handleLogout}
-            onBusiness={() => setCurrentRoute(AppRoute.SETTINGS)}
-            onBookClick={openBooking}
-            onPostClick={openPost}
-            onSendMessage={startChatWithUser}
-            onUpdateProfile={handleProfileUpdate}
-            isOwnProfile
-          />
-        )}
-
-        {currentRoute === AppRoute.PLANNER && (
-          <TravelPlannerView
-            onBack={() => setCurrentRoute(AppRoute.SEARCH)}
-            onBookClick={openBooking}
-            onShareAsPost={handlePlannerShare}
-            onTripSaved={() => openRoute(AppRoute.BOOKINGS)}
-            onNavigateToBookings={() => openRoute(AppRoute.BOOKINGS)}
-          />
-        )}
-
-        {currentRoute === AppRoute.AI_PLANNER && (
-          <AIPlannerView
-            onBack={() => setCurrentRoute(previousRoute)}
-          />
-        )}
-
-        {currentRoute === AppRoute.POST_DETAIL && selectedPost && (
-          <PostDetailView
-            post={selectedPost}
-            onBack={() => setCurrentRoute(previousRoute)}
-            onProfileClick={openProfile}
-            onBookClick={openBooking}
-          />
-        )}
-
-        {currentRoute === AppRoute.USER_PROFILE && selectedUser && (
-          <ProfileView
-            user={selectedUser}
-            posts={posts}
-            onLogout={handleLogout}
-            onBusiness={() => setCurrentRoute(AppRoute.SETTINGS)}
-            onBookClick={openBooking}
-            onPostClick={openPost}
-            onSendMessage={startChatWithUser}
-          />
-        )}
-
-        {currentRoute === AppRoute.NOTIFICATIONS && <NotificationsView />}
-        {currentRoute === AppRoute.CHATS && <ChatsView chats={chats} setChats={setChats} currentUser={currentUser} />}
-
-        {currentRoute === AppRoute.SETTINGS && (
-          <SettingsView
-            onLogout={handleLogout}
-            onAdminPortal={currentUser.isAdmin ? () => setCurrentRoute(AppRoute.ADMIN) : undefined}
-            onProfileEdit={() => setCurrentRoute(AppRoute.PROFILE)}
-          />
-        )}
-
-        {currentRoute === AppRoute.ADMIN && (
-          <AdminDashboardView onBack={() => setCurrentRoute(AppRoute.SETTINGS)} />
-        )}
+        {renderRoute()}
       </main>
 
       <BottomNav
@@ -785,7 +841,12 @@ const AppContent: React.FC = () => {
       )}
 
       {livePost && (
-        <LiveStreamView post={livePost} onClose={() => setLivePost(null)} onProfileClick={openProfile} />
+        <LiveStreamView
+          post={livePost}
+          currentUser={currentUser!}
+          onClose={() => setLivePost(null)}
+          onProfileClick={openProfile}
+        />
       )}
     </div>
   );
